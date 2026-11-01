@@ -1,3 +1,6 @@
 .venv/
 __pycache__/
 *.pyc
+reports/
+*.bak_*.xlsx
+tools/allure/node_modules/
