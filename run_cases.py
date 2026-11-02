@@ -24,7 +24,9 @@
 """
 
 import argparse
+import shutil
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -152,15 +154,29 @@ def cmd_run(args):
         print(f"\n报告：{md_path}")
 
         if allure is not None:
-            index = generate_report(
-                ALLURE_RESULTS, ALLURE_REPORT,
-                single_file=args.allure != "multi",
-                name=f"管伊佳ERP UI 自动化 {time.strftime('%Y-%m-%d %H:%M')}")
-            if index:
-                print(f"Allure：{index}")
-                if args.allure == "multi":
+            # 报告名带时间戳，避免覆盖历史：
+            #   单文件（默认）→ reports/allure-report/20261102_200531.html
+            #   多文件（--allure multi）→ reports/allure-report/20261102_200531/index.html
+            stamp = time.strftime("%Y%m%d_%H%M%S")
+            report_name = f"管伊佳ERP UI 自动化 {time.strftime('%Y-%m-%d %H:%M')}"
+            if args.allure == "multi":
+                report_dir = ALLURE_REPORT / stamp
+                index = generate_report(ALLURE_RESULTS, report_dir,
+                                        single_file=False, name=report_name)
+                if index:
+                    print(f"Allure：{index}")
                     print("        查看：node tools/allure/node_modules/allure-commandline/bin/allure "
-                          f"open {ALLURE_REPORT}")
+                          f"open {report_dir}")
+            else:
+                # Allure CLI 只会输出 index.html，所以先生成到临时目录再改名
+                with tempfile.TemporaryDirectory() as tmp:
+                    index = generate_report(ALLURE_RESULTS, tmp,
+                                            single_file=True, name=report_name)
+                    if index:
+                        target = ALLURE_REPORT / f"{stamp}.html"
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.move(str(index), str(target))
+                        print(f"Allure：{target}")
 
         if not args.keep_data:
             try:

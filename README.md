@@ -75,7 +75,7 @@ Allure 需要机器上有 **Java 11+**（当前环境是 Java 21）。只跑用�
 通过 78 / 失败 2 / 阻塞 7 / 异常 0　总计 87　用时 2948s
 
 报告：reports/run_20261101_223739.md
-Allure：reports/allure-report/index.html
+Allure：reports/allure-report/20261102_200951.html
 ```
 
 退出码：`0` 全绿；`1` 有失败/异常；`2` 登录失效需要人工重新登录。
@@ -87,7 +87,7 @@ Allure：reports/allure-report/index.html
 | 报告 | 位置 | 用途 |
 | --- | --- | --- |
 | Markdown | `reports/run_<时间戳>.md` | 表格一览，贴进缺陷单 / 日报，CI 日志友好 |
-| **Allure** | `reports/allure-report/index.html` | 交互式：按模块/标签分层、看步骤、看失败截图 |
+| **Allure** | `reports/allure-report/<时间戳>.html` | 交互式：按模块/标签分层、看步骤、看失败截图。文件名带时间戳，历史报告不覆盖 |
 
 Allure 默认生成**单文件**（数据内嵌在 `index.html` 里），双击即可打开，不用起服务。
 
@@ -122,7 +122,7 @@ Allure 默认生成**单文件**（数据内嵌在 `index.html` 里），双击�
 多文件版不能用 file:// 直接打开（浏览器会拦数据请求），用 CLI 起本地服务：
 
 ```bash
-node tools/allure/node_modules/allure-commandline/bin/allure open reports/allure-report
+node tools/allure/node_modules/allure-commandline/bin/allure open reports/allure-report/<时间戳>   # 仅 --allure multi 时需要
 ```
 
 ## 项目结构
