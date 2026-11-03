@@ -59,6 +59,7 @@ SEVERITY_MAP = {
 MODULE_MAP = {
     "TC-UNIT": ("商品管理", "多单位"),
     "TC-MAT": ("商品管理", "商品信息"),
+    "TC-DEP": ("基础资料", "仓库信息"),
 }
 
 MAX_STEP_DEPTH = 3  # 步骤最多嵌套三层，更深的不记，避免报告刷屏
@@ -282,6 +283,9 @@ ACTION_METHODS = {
     # ProductPage
     "search_spec", "expand_query", "open_copy_modal", "fill_name", "fill_unit", "fill_basic",
     "cancel", "enable_multi_unit", "disable_multi_unit", "multi_unit_select", "switch_tab",
+    # DepotPage
+    "search_remark", "fill_form", "create", "set_default", "open_set_default_popconfirm",
+    "click_popconfirm_ok", "click_popconfirm_cancel", "choose_manager", "open_manager_options",
 }
 
 

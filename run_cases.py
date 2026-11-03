@@ -38,6 +38,7 @@ from framework.context import Context
 from framework.data import TestData
 from framework.runner import REPORT_DIR, Runner
 from pages.base_page import BasePage
+from pages.depot_page import DepotPage
 from pages.product_page import ProductPage
 from pages.unit_page import UnitPage
 
@@ -128,7 +129,7 @@ def cmd_run(args):
     allure = None
     if args.allure != "off":
         # 给页面对象的动作方法套上「记步骤」，报告里才能看到点了什么、填了什么
-        instrument(BasePage, UnitPage, ProductPage)
+        instrument(BasePage, UnitPage, ProductPage, DepotPage)
         allure = AllureWriter(
             ALLURE_RESULTS,
             run_meta={

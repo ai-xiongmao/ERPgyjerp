@@ -6,6 +6,7 @@
 from cases import (  # noqa: F401
     c_create,
     c_delete,
+    c_depot,
     c_edit,
     c_entry,
     c_list,

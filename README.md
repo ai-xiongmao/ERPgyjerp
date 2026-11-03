@@ -1,9 +1,8 @@
 # ERPgyjerp — 管伊佳 ERP UI 自动化
 
 在**桌面 MyTest 浏览器**里驱动管伊佳 ERP，把 `管伊佳ERP-测试用例.xlsx` 里的
-**87 条用例**（商品管理 → 多单位 44 条、商品信息 43 条）按编号落成可执行脚本，
-自带断言、测试数据回收，以及 **Markdown / JSON / Allure** 三种执行报告；
-另外保留一条独立的 CRUD 冒烟脚本。
+**125 条用例**（多单位 44 条、商品信息 43 条、仓库信息 38 条）按编号落成可执行脚本，
+自带断言、测试数据回收，以及 **Markdown / JSON / Allure** 三种执行报告。
 
 ## 前置条件
 
@@ -30,7 +29,7 @@ Allure 需要机器上有 **Java 11+**（当前环境是 Java 21）。只跑用�
 ## 运行
 
 ```bash
-# 全部 87 条（约 20~30 分钟）
+# 全部 125 条（可自动 117 条，约 60~70 分钟；8 条阻塞会直接跳过）
 ./.venv/Scripts/python.exe run_cases.py
 
 # 只看清单：哪些能自动、哪些需要人工
@@ -52,30 +51,35 @@ Allure 需要机器上有 **Java 11+**（当前环境是 Java 21）。只跑用�
 ./.venv/Scripts/python.exe tools/probe.py            # 当前页面结构
 ./.venv/Scripts/python.exe tools/probe.py modal      # 多单位弹窗 / 校验 / 批量确认框
 ./.venv/Scripts/python.exe tools/probe.py product    # 商品页「多单位」下拉
+./.venv/Scripts/python.exe tools/probe.py depot      # 仓库页表头列序 / 操作列链接 / 新增弹窗 / 设为默认 Popover
 ```
+
+> `probe.py depot` 会把表头按 `cells[i]` 下标逐行打出来，**这是 `pages/depot_page.py` 里 `ROWS_JS`
+> 列索引的唯一依据**——仓库页改版（加减字段、调列序）后先跑它，再对照输出改索引，别凭记忆。
+> 它对弹窗只做「空表单保存」（会被校验拦住、不落库）和「设为默认 → 取消」，不会改真实数据。
 
 > 省略子命令时默认 `run`，旧写法 `run_cases.py --only ...`、`--list` 仍然可用，会自动映射到对应子命令。
 > 原来的 `run_unit_crud.py`（独立 CRUD 冒烟）已删除——它的链路已被 `cases/` 中的用例完全覆盖，
 > 需要冒烟时用 `run_cases.py run --tag 新增 查询`。
 
-输出示例（2026-11-01 全量实跑，87 条）：
+输出示例（2026-11-03 仓库信息模块实跑，36 条可自动）：
 
 ```
-运行前缀 ATTT0T，共 87 条用例
+运行前缀 ATX85P，共 36 条用例
 
-[ 1/87] TC-MAT-001 通过左侧菜单进入商品信息页面
+[ 1/36] TC-DEP-001 通过左侧菜单进入仓库信息页面
         · 偏差：菜单进入后浏览器标题未更新（'管伊佳ERP'）
-        OK   通过（17.7s）
+        OK   通过（16.1s）
 ...
-[83/87] TC-UNIT-014 三个副单位全部填写保存
-        已回收 1 条测试数据
-        FAIL 失败（30.6s）｜保存未成功，接口提示「数据写入异常」
+[23/36] TC-DEP-023 仓库名称超长与特殊字符
+        · 缺陷：仓库名称含 emoji 时保存报「数据查询异常」，弹窗保持打开无法保存
+        FAIL 失败（17.0s）｜仓库名称含 emoji 应可正常保存，实际触发「数据查询异常」
 ...
 
-通过 78 / 失败 2 / 阻塞 7 / 异常 0　总计 87　用时 2948s
+通过 35 / 失败 1 / 阻塞 0 / 异常 0　总计 36　用时 785s
 
-报告：reports/run_20261101_223739.md
-Allure：reports/allure-report/20261102_200951.html
+报告：reports/run_20261103_182121.md
+Allure：reports/allure-report/20261103_182121.html
 ```
 
 退出码：`0` 全绿；`1` 有失败/异常；`2` 登录失效需要人工重新登录。
@@ -89,11 +93,12 @@ Allure：reports/allure-report/20261102_200951.html
 | Markdown | `reports/run_<时间戳>.md` | 表格一览，贴进缺陷单 / 日报，CI 日志友好 |
 | **Allure** | `reports/allure-report/<时间戳>.html` | 交互式：按模块/标签分层、看步骤、看失败截图。文件名带时间戳，历史报告不覆盖 |
 
-Allure 默认生成**单文件**（数据内嵌在 `index.html` 里），双击即可打开，不用起服务。
+Allure 默认生成**单文件**（数据内嵌在同一个 html 里），双击即可打开，不用起服务。
 
 ### Allure 里能看到什么
 
-- 分层：`Suites` / `Behaviors` 按「商品管理 → 多单位 / 商品信息 → 标签 → 用例」三级排布；
+- 分层：`Suites` / `Behaviors` 按「一级模块 → 二级功能 → 标签 → 用例」排布，
+  当前三个模块是：商品管理 → 多单位、商品管理 → 商品信息、**基础资料 → 仓库信息**；
 - 每条用例拆成四段步骤：`前置：登录态检查` → `执行用例：<标题>` → `收尾：页面复位` → `收尾：数据回收`；
 - 「执行用例」下面自动记录页面动作，例如
   `create('ATxxxxU01', [('箱', 10)])` → `fill_form(...)` → `save_success()`，失败时一眼看出停在哪步；
@@ -113,60 +118,86 @@ Allure 默认生成**单文件**（数据内嵌在 `index.html` 里），双击�
 ### 常用开关
 
 ```bash
-./.venv/Scripts/python.exe run_cases.py --no-allure           # 只出 md/json，不写 Allure
-./.venv/Scripts/python.exe run_cases.py --allure-multi-file   # 多文件版（支持跨次趋势/历史）
-./.venv/Scripts/python.exe run_cases.py --allure-keep-results  # 保留上次结果，多次运行合并进同一份报告
+# Allure：默认 auto（单文件），off 关闭，multi 出多文件版
+./.venv/Scripts/python.exe run_cases.py run --allure off
+./.venv/Scripts/python.exe run_cases.py run --allure multi
+
+# 排查问题时常用
+./.venv/Scripts/python.exe run_cases.py run --keep-data            # 跑完不回收数据
+./.venv/Scripts/python.exe run_cases.py run --data-prefix ATDEMO   # 指定运行前缀，便于复现与手工清理
+./.venv/Scripts/python.exe run_cases.py run --relogin-wait 120     # 等人工重新登录的秒数
+./.venv/Scripts/python.exe run_cases.py run --report-dir ./out     # 报告换个目录
 ```
 
-每次运行默认清空 `reports/allure-results`，所以报告只反映本次；要累积就用 `--allure-keep-results`。
-多文件版不能用 file:// 直接打开（浏览器会拦数据请求），用 CLI 起本地服务：
+每次运行默认清空 `reports/allure-results`，所以报告只反映本次，没有跨次合并的开关。
+
+`multi` 生成的是目录版（`reports/allure-report/<时间戳>/index.html`），不能用 `file://` 直接打开
+（浏览器会拦数据请求），要用 CLI 起本地服务：
 
 ```bash
-node tools/allure/node_modules/allure-commandline/bin/allure open reports/allure-report/<时间戳>   # 仅 --allure multi 时需要
+node tools/allure/node_modules/allure-commandline/bin/allure open reports/allure-report/<时间戳>
 ```
 
 ## 项目结构
 
 ```
 ERPgyjerp/
-├── config.py               # 系统地址、CDP 端点、动作间隔
-├── browser.py              # 通过 CDP 接入桌面 MyTest 浏览器 + 登录态守卫
-├── framework/
-│   ├── registry.py         # 用例注册表（编号 ↔ 函数，编号即执行顺序）
-│   ├── asserts.py          # 断言（失败信息带实际值 vs 期望值）
-│   ├── data.py             # 测试数据工厂（运行前缀、命名、记账）
-│   ├── context.py          # 用例拿到的工具箱：页面对象 + 造数 + 收尾
-│   ├── runner.py           # 执行器：跑用例、收尾、报告、回填 Excel
-│   └── allure_report.py    # Allure 写入（步骤/截图/标签）+ 调 CLI 生成 HTML
-├── pages/
-│   ├── base_page.py        # Ant Design 通用交互：按钮/toast/确认框/浮层清理
-│   ├── unit_page.py        # 多单位：增删改查 + 勾选 + 批量 + 分页 + 状态
-│   └── product_page.py     # 商品信息：列表/查询/新增/编辑/复制/批量/多单位/列设置
-├── cases/                  # 按用例标签分文件，一个函数对应一条用例
-│   ├── c_entry.py          # UNIT 001-003 页面入口
-│   ├── c_list.py           # UNIT 004、005、034、035、036 列表展示
-│   ├── c_query.py          # UNIT 006-011 查询
-│   ├── c_create.py         # UNIT 012-023、038、040、041、043 新增
-│   ├── c_edit.py           # UNIT 024、025 编辑
-│   ├── c_status.py         # UNIT 026-029、039 状态与批量
-│   ├── c_delete.py         # UNIT 030-033 删除
-│   ├── c_product.py        # UNIT 042 商品联动（含 037、044 的人工登记）
-│   └── c_material.py       # MAT 001-043 商品信息
+├── run_cases.py                # 唯一执行入口：run / list 两个子命令
+├── config.py                   # 系统地址、CDP 端点、动作间隔
+├── browser.py                  # 通过 CDP 接入桌面 MyTest 浏览器 + 登录态守卫
+├── requirements.txt            # playwright / openpyxl / allure-python-commons
+├── 管伊佳ERP-测试用例.xlsx      # 用例来源，也是 --update-xlsx 的回填目标（回填前自动备份）
+│
+├── framework/                  # 与业务无关的执行骨架
+│   ├── registry.py             # 用例注册表（@case 注册，编号即执行顺序）
+│   ├── asserts.py              # 断言：check / check_eq / check_contains / blocked
+│   ├── data.py                 # 测试数据工厂：运行前缀、命名、记账
+│   ├── context.py              # 用例工具箱：页面对象 + 造数 + reset / cleanup
+│   ├── runner.py               # 执行器：跑用例、收尾、报告、回填 Excel
+│   └── allure_report.py        # Allure 写入（步骤/截图/标签）+ 调 CLI 生成 HTML
+│
+├── pages/                      # 页面对象：只放选择器与页面交互，不含断言
+│   ├── base_page.py            # AntD 通用：按钮 / toast / 确认框 / Popover / 浮层清理
+│   ├── unit_page.py            # 多单位：增删改查 + 勾选 + 批量 + 分页 + 状态
+│   ├── product_page.py         # 商品信息：列表/查询/新增/编辑/复制/批量/多单位/列设置
+│   └── depot_page.py           # 仓库信息：增删改查 + 设为默认 + 启用禁用 + 负责人下拉
+│
+├── cases/                      # 用例：一个函数 = 一条用例，文件名按标签划分
+│   ├── _helpers.py             # 公共小工具：单位名拼接、提示文案匹配
+│   ├── c_entry.py              # 页面入口：UNIT 001-003
+│   ├── c_list.py               # 列表展示：UNIT 004/005/034/035/036
+│   ├── c_query.py              # 查询：UNIT 006-011
+│   ├── c_create.py             # 新增：UNIT 012-023/038/040/041/043
+│   ├── c_edit.py               # 编辑：UNIT 024/025
+│   ├── c_status.py             # 状态与批量：UNIT 026-029/039
+│   ├── c_delete.py             # 删除：UNIT 030-033
+│   ├── c_product.py            # 商品联动：UNIT 042（037/044 为人工登记）
+│   ├── c_material.py           # 商品信息：MAT 001-043
+│   └── c_depot.py              # 仓库信息：DEP 001-038
+│
 ├── tools/
-│   ├── probe.py            # 页面探查（dom / modal / product 三种模式）
-│   └── allure/             # 随项目安装的 allure-commandline（node_modules 不入库）
-├── reports/                # run_*.md 与 allure-results / allure-report
-└── run_cases.py            # 唯一执行入口（run / list 子命令）
+│   ├── probe.py                # 页面探查：dom / modal / product / depot
+│   └── allure/                 # 随项目安装的 allure-commandline（node_modules 不入库）
+│
+└── reports/                    # 运行产物（已 gitignore）
+    ├── run_<时间戳>.md          # 人读报告
+    ├── run_<时间戳>.json        # 结构化结果：运行前缀、汇总、逐条用例结果
+    ├── allure-results/         # Allure 原始结果，每次运行前清空
+    └── allure-report/          # <时间戳>.html 单文件报告，双击即可用浏览器打开
 ```
+
+> `framework/__init__.py`、`pages/__init__.py` 只有一行包说明 docstring，无逻辑；`--update-xlsx` 产生的备份
+> 落在同一目录，形如 `管伊佳ERP-测试用例.bak_<时间戳>.xlsx`。
 
 ## 用例覆盖
 
 | 范围 | 条数 | 说明 |
 | --- | --- | --- |
-| 可自动化 | 81 | 跑脚本即出结论，结果为 通过/失败 |
-| 阻塞（人工） | 6 | TC-UNIT-033、036、037、044 与 TC-MAT-037、039，原因见下表 |
+| 合计 | 125 | 多单位 44 + 商品信息 43 + 仓库信息 38 |
+| 可自动化 | 117 | 跑脚本即出结论，结果为 通过/失败（UNIT 40 / MAT 41 / DEP 36） |
+| 阻塞（人工） | 8 | 见下表，脚本会如实标注「阻塞」，不会假装通过 |
 
-阻塞原因（脚本会如实标注「阻塞」，不会假装通过）：
+阻塞原因：
 
 | 编号 | 原因 |
 | --- | --- |
@@ -176,6 +207,8 @@ ERPgyjerp/
 | TC-UNIT-044 | 依赖 TC-UNIT-033 与商品详情核对，同样涉及真实业务数据 |
 | TC-MAT-037 | 需要一条被采购/销售单据引用的商品，构造前置会改动真实业务数据 |
 | TC-MAT-039 | 同 TC-UNIT-037，需账号试用到期 |
+| TC-DEP-033 | 需要「已被业务单据引用」的仓库；构造引用会改动真实单据数据，属破坏性前置 |
+| TC-DEP-037 | 同 TC-UNIT-037，需账号试用到期 |
 
 写用例的方式：
 
@@ -194,7 +227,9 @@ def tc_unit_013(ctx):
 而不是写成断言失败——报告里会归到「阻塞」，Allure 里是 skipped，原因原样带出去。
 条件不具备就跳过、不硬凑通过，条件不具备也别冤枉成缺陷。
 
-## 本次实测发现（2026-11-01 全量跑批：78 通过 / 2 失败 / 7 阻塞 / 0 异常）
+## 实测发现（按最新一次全量）
+
+### 多单位 + 商品信息（2026-11-01：78 通过 / 2 失败 / 7 阻塞 / 0 异常）
 
 | 编号 | 结论 | 实测现象 |
 | --- | --- | --- |
@@ -207,7 +242,21 @@ def tc_unit_013(ctx):
 
 另外：页面上没有面包屑元素，位置由页签栏（首页 / 多单位 或 首页 / 商品信息）承担，用例按此适配并记了偏差。
 
+### 仓库信息（2026-11-03：35 通过 / 1 失败 / 0 阻塞 / 0 异常）
+
+| 编号 | 结论 | 实测现象 |
+| --- | --- | --- |
+| TC-DEP-023 | **缺陷** | 仓库名称含 emoji（😀）保存即报「数据查询异常」：弹窗保持打开、数据不落库。引号 `"` 可正常保存；名称长度限制 2~30 字符正常拦截 |
+| TC-DEP-014 | 偏差 | 空表单保存的红字是「请输入仓库名称! 未知异常」，比其他模块多出「未知异常」后缀 |
+| TC-DEP-018 | 偏差 | 仓储费 / 搬运费无前端格式校验：负数、小数可直接保存；填非数字时后端静默失败——弹窗关闭、列表无记录、无任何提示 |
+| TC-DEP-019 | 偏差 | 排序字段无数字校验，字符串可保存；是否真正影响列表顺序尚未确认 |
+| TC-DEP-001 | 偏差 | 菜单进入后浏览器标题不更新（与 TC-UNIT-001 / TC-MAT-001 同一现象） |
+
+另外：「负责人」下拉的选项来自账号管理，当前是 `aitest1029`、`testai01`；该下拉为空时 TC-DEP-020 会记「阻塞」而不是判失败。
+
 ## 实测到的页面契约（改前端后请重新核对）
+
+### 多单位 `/system/unit`
 
 - 表头列序：`勾选框 | # | 操作 | 单位名称 | 基本单位 | 副单位 | 副单位2 | 副单位3 | 状态`
   （`pages/unit_page.py` 的 `COL_*` 常量按此取值）
@@ -224,6 +273,31 @@ def tc_unit_013(ctx):
   其余拦截是**顶部 toast** `.ant-message-notice`（「抱歉，副单位不能为空！」等，约 3 秒消失）
 - 分页 `.ant-pagination`：每页 10 条，总数文案「1-10 共26条」，>10 条才出现分页器
 - 页面**没有**面包屑 `.ant-breadcrumb`，位置由页签栏（首页 / 多单位）承担，TC-001 已按此适配
+
+### 仓库信息 `/system/depot`
+
+- 表头 **12 列**，比多单位页多一个独立的 `#` 序号列，且「负责人 / 备注」排在「排序」之前：
+  `勾选框 | # | 操作 | 仓库名称 | 仓库地址 | 仓储费 | 搬运费 | 负责人 | 备注 | 排序 | 状态 | 是否默认`
+  （`pages/depot_page.py` 的 `ROWS_JS` 按下标取，改版后先用 `tools/probe.py depot` 核一遍）
+- 操作列有**三个行内链接**：`设为默认` / `编辑` / `删除`（多单位页只有「删除」）
+- 「设为默认」走 `.ant-popover`（不是 Popconfirm），文案「确定设为默认吗?」，按钮「取 消」「确 定」
+- 表单字段 id：`#name`（必填，2~30 字符）、`#address`、`#warehousing`（元/天/KG）、
+  `#truckage`（元）、`#sort`、`#remark`，负责人是弹窗内**唯一**的 `.ant-select`（占位「选择负责人」）
+- 默认仓库规则：**列表为空时，第一条保存的仓库自动成为默认**；之后新增默认「否」，
+  同一时间只有一条「是」，改默认只能靠行内「设为默认」
+- 删除/启用/禁用同样走 `.ant-modal-confirm`，与多单位页一致
+- 校验提示同样落在 `.ant-form-explain`，但**父级 `.ant-form-item` 不加 `has-error`**，
+  不能按 has-error 筛，只能收集非空提示文本
+
+### 商品信息 `/material/material`
+
+- 表头与列索引见 `pages/product_page.py` 的 `COL_*` 常量；列表/查询/新增/编辑/复制/批量/多单位均在
+  同一个页面对象里
+- `#mnemonic`（助记码）是 **readonly**，由系统按名称自动生成，不能手动 fill
+- 批量编辑点「保存」后先弹 `.ant-modal-confirm`「确认操作 / 是否操作选中的N条数据?」，
+  点确定才发 `/material/batchUpdate`（`save_batch()` 处理）
+- 新增弹窗里有两个 `.ant-btn-primary`（「插入行」和「保存」），必须 `filter(has_text="保存")`
+
 
 ## 登录过期怎么处理
 
@@ -296,10 +370,12 @@ ERP_ACTION_DELAY_MS=0    ./.venv/Scripts/python.exe run_cases.py  # 关闭间隔
 
 ## 测试数据纪律
 
-- 每次运行生成独立前缀（`AT` + 4 位 36 进制时间片，如 `ATRVZG`），
-  用例里的单位名统一 9 字符：`<前缀><类型位><2 位序号>`，如 `ATRVZGU01`；
+- 每次运行生成独立前缀（`AT` + 4 位 36 进制时间片，如 `ATRVZG`），造的数据一律带前缀：
+  - 单位名统一 9 字符：`<前缀><类型位><2 位序号>`，如 `ATRVZGU01`；
+  - 商品名、仓库名同构：`ATRVZGM01`、`ATRVZGD01`（M = 商品，D = 仓库）；
 - **先记账再落库**：即使创建中途失败，收尾也会去清掉半个数据；
 - 收尾两条策略：按运行前缀模糊回收（覆盖绝大多数），
   对名字里不含前缀的极少数记录（如 TC-020 的超长/emoji 名）按名字精确回收；
-- 回收前会再校验「单位名称或基本单位含运行前缀」，**绝不按关键字删既有业务数据**；
+- 回收前会再校验「名称或基本单位含运行前缀」，**绝不按关键字删既有业务数据**；
+- 收尾按页面分三次走：多单位 → 商品信息 → 仓库信息，各自只在对应页面做模糊回收；
 - 断言按「基本单位」列做整格精确比较，同名多行用序号区分（TC-019）。

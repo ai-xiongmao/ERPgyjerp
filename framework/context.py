@@ -9,6 +9,7 @@
 from browser import SessionExpiredError
 from config import BASE_URL, UNIT_PATH
 from framework.data import TestData
+from pages.depot_page import DepotPage
 from pages.product_page import ProductPage
 from pages.unit_page import UnitPage
 
@@ -19,6 +20,7 @@ class Context:
         self.data = data or TestData()
         self.unit = UnitPage(page)
         self.product = ProductPage(page)
+        self.depot = DepotPage(page)
         self.notes = []
         self._log = log
 
@@ -37,6 +39,9 @@ class Context:
 
     def open_product(self):
         return self.product.open()
+
+    def open_depot(self):
+        return self.depot.open()
 
     # ---------- 数据 ----------
     def new_unit(self, others=(), basic=None, kind="U"):
@@ -59,22 +64,41 @@ class Context:
         self.product.create(name, unit)
         return name
 
+    def new_depot(self, name=None, address=None, warehousing=None,
+                  truckage=None, sort=None, remark=None, kind="D"):
+        """造一条仓库并记账，返回仓库名称。"""
+        name = name or self.data.depot_name(kind)
+        self.data.track_depot(name)
+        self.open_depot()
+        self.depot.create(name, address, warehousing, truckage, sort, remark)
+        return name
+
     # ---------- 收尾 ----------
-    def _current_is_product(self):
-        """判断当前是否停在商品信息页（否则按多单位页处理）。"""
-        return "/material/material" in (self.page.url or "")
+    def _current_page(self):
+        """判断当前停在哪个业务页面：返回 'product' / 'depot' / 'unit'。"""
+        url = self.page.url or ""
+        if "/material/material" in url:
+            return "product"
+        if "/system/depot" in url:
+            return "depot"
+        return "unit"
 
     def reset(self):
         """把页面恢复到干净状态：关浮层、清勾选、清查询条件。
 
         根据当前页面选择对应的页面对象做收尾，不强制跳转——
-        商品用例结束后若被导航回多单位页，会让商品侧清理找不到查询框。
+        用例结束后若被导航回其他页面，会让对应页面对象的清理找不到查询框。
         """
         try:
-            if self._current_is_product():
+            current = self._current_page()
+            if current == "product":
                 self.product.close_overlays()
                 self.product.clear_selection()
                 self.product.reset()
+            elif current == "depot":
+                self.depot.close_overlays()
+                self.depot.clear_selection()
+                self.depot.reset()
             else:
                 if UNIT_PATH not in (self.page.url or ""):
                     self.page.goto(BASE_URL + UNIT_PATH, wait_until="domcontentloaded")
@@ -94,13 +118,11 @@ class Context:
             pass
 
     def cleanup(self):
-        """回收本次运行造的数据（多单位 + 商品）。
+        """回收本次运行造的数据（多单位 + 商品 + 仓库）。
 
-        两条策略：按运行前缀模糊回收（覆盖绝大多数），
-        再对「名字里不含前缀」的少数记录按名字精确回收。
-        没有造过数据就直接返回，避免白跑一次查询。
+        按运行前缀模糊回收（覆盖绝大多数）；没有造过数据就直接返回。
         """
-        if not self.data.created and not self.data.materials:
+        if not self.data.created and not self.data.materials and not self.data.depots:
             return 0
         removed = 0
         try:
@@ -121,4 +143,12 @@ class Context:
             raise
         except Exception as exc:  # noqa: BLE001
             self.log(f"清理商品残留失败：{type(exc).__name__}: {exc}")
+        try:
+            if self.data.depots:
+                self.open_depot()  # 确保停在仓库页，清理才找得到查询框
+                removed += self.depot.cleanup_contains(self.data.token)
+        except SessionExpiredError:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            self.log(f"清理仓库残留失败：{type(exc).__name__}: {exc}")
         return removed

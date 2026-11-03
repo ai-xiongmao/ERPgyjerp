@@ -30,6 +30,7 @@ class TestData:
         self._seq = 0
         self._created = []      # [(基本单位, 副单位列表)]
         self._materials = []    # [商品名称]
+        self._depots = []       # [仓库名称]
 
     # ---------- 命名 ----------
     def name(self, kind="U"):
@@ -39,6 +40,11 @@ class TestData:
 
     def material_name(self, kind="M"):
         """生成一个商品名称（名称字段无 10 字符限制，仍带运行前缀便于回收）。"""
+        self._seq += 1
+        return f"{self.run_id}{kind}{self._seq:02d}"
+
+    def depot_name(self, kind="D"):
+        """生成一个仓库名称（带运行前缀便于回收）。"""
         self._seq += 1
         return f"{self.run_id}{kind}{self._seq:02d}"
 
@@ -57,6 +63,11 @@ class TestData:
         self._materials.append(name)
         return name
 
+    def track_depot(self, name):
+        """记账一条仓库名称，跑完按前缀回收。"""
+        self._depots.append(name)
+        return name
+
     @property
     def created(self):
         return list(self._created)
@@ -66,8 +77,16 @@ class TestData:
         return list(self._materials)
 
     @property
+    def depots(self):
+        return list(self._depots)
+
+    @property
     def has_material(self):
         return bool(self._materials)
+
+    @property
+    def has_depot(self):
+        return bool(self._depots)
 
     def unmatched_names(self):
         """记账里「不含运行前缀」的名字——按前缀搜不到，需要按名字精确回收。"""

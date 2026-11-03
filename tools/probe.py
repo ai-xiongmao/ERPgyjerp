@@ -7,9 +7,10 @@
     python tools/probe.py dom            # 同上
     python tools/probe.py modal          # 多单位新增弹窗 / 校验提示 / 批量确认框
     python tools/probe.py product        # 商品信息页「多单位」下拉
+    python tools/probe.py depot          # 仓库信息页：表头列序 / 操作列链接 / 新增弹窗 / 设为默认 Popover
 
-注意：modal / product 会真实打开弹窗并做少量交互（结尾会取消关闭），
-会短暂占用浏览器，但不会留下业务数据。
+注意：modal / product / depot 会真实打开弹窗并做少量交互（结尾会取消关闭），
+会短暂占用浏览器，但不会留下业务数据（depot 只做空表单保存 + Popover 取消）。
 """
 
 import json
@@ -234,10 +235,132 @@ def probe_product(page):
     print("\n弹窗剩余:", page.locator(".ant-modal:visible").count())
 
 
+# ==================== depot：仓库信息页 ====================
+DEPOT_PATH = "/system/depot"
+
+DEPOT_TABLE_JS = """() => {
+    const text = el => (el ? (el.innerText || '').trim() : null);
+    const ths = Array.from(document.querySelectorAll('.ant-table-thead th'));
+    const rows = Array.from(document.querySelectorAll('.ant-table-tbody tr.ant-table-row'));
+    return {
+        headers: ths.map((th, i) => ({
+            i,
+            text: text(th),
+            hasCheckbox: !!th.querySelector('.ant-checkbox, input[type=checkbox]'),
+        })),
+        rowCount: rows.length,
+        empty: text(document.querySelector('.ant-empty')),
+        rows: rows.slice(0, 3).map(tr => ({
+            cells: Array.from(tr.children).map(td => text(td)),
+            links: Array.from(tr.querySelectorAll('a')).map(text),
+            selects: tr.querySelectorAll('.ant-select').length,
+        })),
+        pagination: text(document.querySelector('.ant-pagination')),
+    };
+}"""
+
+DEPOT_ERRORS_JS = """() => {
+    const m = Array.from(document.querySelectorAll('.ant-modal'))
+        .filter(x => x.offsetWidth || x.offsetHeight).pop();
+    if (!m) return {none: true};
+    // 这套系统的校验提示挂在 .ant-form-explain 上，父级 .ant-form-item 不加 has-error，
+    // 所以只能按「非空提示文本」收集，不能靠 has-error 筛选。
+    return Array.from(m.querySelectorAll('.ant-form-explain'))
+        .map(e => (e.innerText || '').trim())
+        .filter(t => t);
+}"""
+
+DEPOT_POPOVER_JS = """() => {
+    const p = Array.from(document.querySelectorAll('.ant-popover'))
+        .filter(x => x.offsetWidth || x.offsetHeight).pop();
+    if (!p) return {none: true};
+    const t = el => (el ? (el.innerText || '').trim() : null);
+    return {
+        text: t(p),
+        cls: p.className,
+        buttons: Array.from(p.querySelectorAll('button')).map(b => ({
+            text: t(b), cls: b.className,
+        })),
+    };
+}"""
+
+
+def probe_depot(page):
+    """仓库信息页：表头列序、操作列链接、新增弹窗字段、空表单校验、设为默认 Popover。
+
+    表头列序是 pages/depot_page.py 里 ROWS_JS 列索引的唯一依据，
+    改版后先跑这个，再对照 cells 下标改索引。
+
+    只做不落库的交互：空表单保存会被校验拦住；设为默认只开 Popover 后取消。
+    """
+    page.keyboard.press("Escape")
+    page.wait_for_timeout(400)
+    page.goto(BASE_URL + DEPOT_PATH, wait_until="domcontentloaded")
+    page.wait_for_timeout(3000)
+    print("url:", page.url, "title:", page.title())
+
+    table = page.evaluate(DEPOT_TABLE_JS)
+    print("\n== 表头（下标 = JS 里 cells[i]，即第 i+1 个 td）==")
+    for h in table["headers"]:
+        mark = "  <- 勾选框列" if h["hasCheckbox"] else ""
+        print(f"  cells[{h['i']}] = {h['text']!r}{mark}")
+    print("\n行数:", table["rowCount"], "| 空态:", table["empty"], "| 分页:", table["pagination"])
+    print("\n== 前 3 行（cells / 操作列链接）==")
+    print(json.dumps(table["rows"], ensure_ascii=False, indent=1))
+
+    print("\n== 工具栏按钮 ==")
+    print(json.dumps(page.evaluate(
+        "() => Array.from(document.querySelectorAll('button')).map(b => b.innerText.trim()).filter(Boolean)"
+    ), ensure_ascii=False))
+
+    page.locator("button").filter(has_text="新增").first.click()
+    page.wait_for_timeout(1500)
+    print("\n== 新增弹窗 ==")
+    print(json.dumps(page.evaluate(MODAL_JS), ensure_ascii=False, indent=1))
+
+    # 空表单保存：只验证校验提示，不会落库
+    page.locator(".ant-modal-wrap:visible button").filter(has_text="保 存").first.click()
+    page.wait_for_timeout(1500)
+    print("\n== 空表单保存后 ==")
+    print("toast:", json.dumps(page.evaluate(TOAST_JS), ensure_ascii=False))
+    print("校验提示:", json.dumps(page.evaluate(DEPOT_ERRORS_JS), ensure_ascii=False))
+    print("弹窗还开着？", page.locator(".ant-modal-wrap:visible").count())
+
+    cancel = page.locator(".ant-modal-wrap:visible button").filter(has_text="取 消")
+    if cancel.count():
+        cancel.first.click()
+        try:  # 关闭动画比想象的慢，等可见性消失而不是固定 sleep
+            page.locator(".ant-modal-wrap:visible").first.wait_for(state="hidden", timeout=6000)
+        except Exception:  # noqa: BLE001 - 关不掉也不该让探查中断
+            pass
+    print("取消后弹窗剩余:", page.locator(".ant-modal-wrap:visible").count())
+
+    # 设为默认：只打开 Popover 看结构，随后取消，不动真实默认仓库
+    link = page.locator(".ant-table-tbody tr.ant-table-row a").filter(has_text="设为默认")
+    print("\n「设为默认」链接数量:", link.count())
+    if not link.count():
+        print("列表无数据行，跳过设为默认（Popover）探查")
+        return
+    link.first.click()
+    page.wait_for_timeout(1000)
+    print("\n== 设为默认 Popover ==")
+    print(json.dumps(page.evaluate(DEPOT_POPOVER_JS), ensure_ascii=False, indent=1))
+
+    pc = page.locator(".ant-popover:visible button").filter(has_text="取 消")
+    if pc.count():
+        pc.first.click()
+        try:
+            page.locator(".ant-popover:visible").first.wait_for(state="hidden", timeout=6000)
+        except Exception:  # noqa: BLE001
+            pass
+    print("Popover 剩余:", page.locator(".ant-popover:visible").count())
+
+
 MODES = {
     "dom": probe_dom,
     "modal": probe_modal,
     "product": probe_product,
+    "depot": probe_depot,
 }
 
 
