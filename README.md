@@ -1,10 +1,20 @@
-# ERPgyjerp — 管伊佳 ERP UI 自动化
+# ERPgyjerp — 管伊佳 ERP UI + 接口自动化
 
-在**桌面 MyTest 浏览器**里驱动管伊佳 ERP，把 `管伊佳ERP-测试用例.xlsx` 里的
-**125 条用例**（多单位 44 条、商品信息 43 条、仓库信息 38 条）按编号落成可执行脚本，
-自带断言、测试数据回收，以及 **Markdown / JSON / Allure** 三种执行报告。
+把 `管伊佳ERP-测试用例.xlsx` 里的 **125 条用例**（多单位 44 条、商品信息 43 条、仓库信息 38 条）
+按编号落成可执行脚本，**同一套编号、两套实现**：
+
+| 层 | 实现 | 条数 | 单条耗时 | 用途 |
+| --- | --- | --- | --- | --- |
+| UI（默认） | 在桌面 MyTest 浏览器里点页面 | 117 | 10~30 秒 | 端到端验证，看得到界面反馈 |
+| 接口 | 直接打后端 `/jshERP-boot/*` | 71 | 0.2~3 秒 | 快速回归、校验服务端真实约束 |
+
+两层都自带断言、测试数据回收，以及 **Markdown / JSON / Allure** 三种执行报告。
+表里是「能自动跑的条数」，另有 UI 8 条 / 接口 7 条为阻塞（需人工或前置不具备），
+脚本会如实标「阻塞」而不是假装通过，明细见「用例覆盖」。
 
 ## 前置条件
+
+**UI 层（`--layer ui`，默认）**
 
 1. 双击桌面 **MyTest.exe** 打开浏览器（它启动时带 `--remote-debugging-port=9231`，
    见 `MyTest.exe.lnk` 的启动参数），并在其中登录 https://cloud.gyjerp.com ；
@@ -12,6 +22,12 @@
 
 > 为什么走 CDP 接入而不是自己 launch：MyTest 里已有登录态和完整的业务现场，
 > 直接接管可以跳过账号/验证码，也不会干扰用户正在看的页面。
+
+**接口层（`--layer api`）**
+
+1. 首次运行需要 MyTest 浏览器开着并已登录——从中取一次 `x-access-token` 并缓存到 `.api_token`；
+2. 之后**浏览器不开也能跑**，可进 CI。token 失效（服务端返回登录过期）会自动回源重取，
+   此时仍需浏览器在线；浏览器也不在就报错退出，不会静默跑空。
 
 ## 安装
 
@@ -26,16 +42,52 @@ npm install --prefix tools/allure allure-commandline
 
 Allure 需要机器上有 **Java 11+**（当前环境是 Java 21）。只跑用例不出 Allure 的话这一步可以跳过。
 
+接口层不引入新依赖（HTTP 用标准库 `urllib`），Python 环境装好即可跑。
+
 ## 运行
+
+### 交互式（手动跑推荐）
+
+```bash
+./.venv/Scripts/python.exe run_cases.py
+```
+
+不带任何参数时先进菜单，选好范围再执行：
+
+```
+==============================================================
+ 管伊佳ERP UI 自动化
+ 共 125 条：可自动 117 条，阻塞/人工 8 条
+==============================================================
+   1  全部执行
+   2  按模块执行（多单位 / 商品信息 / 仓库信息）
+   3  按标签执行（页面入口 / 查询 / 新增 …）
+   4  输入用例编号
+   5  只看清单，不执行
+   q  退出
+
+ 请选择 [1]:
+```
+
+- 选 2 / 3 会再列出模块或标签（各自带条数与可自动数），可单选也可多选：`1`、`1,3`、`1-3`
+- 选 4 支持逗号与同前缀区间：`TC-DEP-001,TC-DEP-005`、`TC-DEP-001-010`
+- 选完先显示「待执行 N 条」：回车开始、`u` 开始并回填用例表、`n` 返回重选
+- 二级菜单里输 `b` 可返回主菜单，输错序号会原地重问，不会把你踢回顶层
+- 菜单只跑 **UI 层**；要跑接口层用 `run_cases.py run --layer api`（见下文）
+
+### 直接指定（脚本 / CI）
+
+只要带了参数就不进菜单：
 
 ```bash
 # 全部 125 条（可自动 117 条，约 60~70 分钟；8 条阻塞会直接跳过）
-./.venv/Scripts/python.exe run_cases.py
+./.venv/Scripts/python.exe run_cases.py run
 
 # 只看清单：哪些能自动、哪些需要人工
 ./.venv/Scripts/python.exe run_cases.py list
 
-# 按编号 / 标签 / 起始编号挑着跑
+# 按模块 / 编号 / 标签 / 起始编号挑着跑
+./.venv/Scripts/python.exe run_cases.py run --module DEP
 ./.venv/Scripts/python.exe run_cases.py run --only TC-UNIT-012,TC-UNIT-013
 ./.venv/Scripts/python.exe run_cases.py run --tag 新增 查询
 ./.venv/Scripts/python.exe run_cases.py run --from TC-MAT-001
@@ -46,8 +98,19 @@ Allure 需要机器上有 **Java 11+**（当前环境是 Java 21）。只跑用�
 # Allure 报告：默认单文件；off 关闭；multi 生成多文件版
 ./.venv/Scripts/python.exe run_cases.py run --allure off
 ./.venv/Scripts/python.exe run_cases.py run --allure multi
+```
 
-# 页面探查（新增用例或页面改版后核对选择器，不产生业务数据）
+`--module` 可选值：`UNIT` 多单位、`MAT` 商品信息、`DEP` 仓库信息，可写多个（`--module UNIT DEP`）。
+`--layer` 可选值：`ui`（默认，走页面）、`api`（打接口），详见下文「接口自动化」。
+
+> 非交互环境（重定向、后台、CI）里即使不带参数也不会等输入，会直接跑全部并打一行提示，
+> 不会把流水线挂住。想在终端里跳过菜单，用 `run_cases.py run`。
+
+### 页面探查
+
+新增用例或页面改版后核对选择器，不产生业务数据：
+
+```bash
 ./.venv/Scripts/python.exe tools/probe.py            # 当前页面结构
 ./.venv/Scripts/python.exe tools/probe.py modal      # 多单位弹窗 / 校验 / 批量确认框
 ./.venv/Scripts/python.exe tools/probe.py product    # 商品页「多单位」下拉
@@ -58,7 +121,7 @@ Allure 需要机器上有 **Java 11+**（当前环境是 Java 21）。只跑用�
 > 列索引的唯一依据**——仓库页改版（加减字段、调列序）后先跑它，再对照输出改索引，别凭记忆。
 > 它对弹窗只做「空表单保存」（会被校验拦住、不落库）和「设为默认 → 取消」，不会改真实数据。
 
-> 省略子命令时默认 `run`，旧写法 `run_cases.py --only ...`、`--list` 仍然可用，会自动映射到对应子命令。
+> 旧写法 `run_cases.py --only ...`、`--list` 仍然可用，会自动映射到对应子命令。
 > 原来的 `run_unit_crud.py`（独立 CRUD 冒烟）已删除——它的链路已被 `cases/` 中的用例完全覆盖，
 > 需要冒烟时用 `run_cases.py run --tag 新增 查询`。
 
@@ -84,6 +147,90 @@ Allure：reports/allure-report/20261103_182121.html
 
 退出码：`0` 全绿；`1` 有失败/异常；`2` 登录失效需要人工重新登录。
 
+## 接口自动化（--layer api）
+
+同一套**用例编号**，两套实现：`--layer ui` 走浏览器页面（默认），`--layer api` 直接打后端接口。
+接口层一条用例通常 0.2~3 秒，UI 层 10~30 秒，回归用它快一个数量级。
+
+当前接口层覆盖 **71 / 125** 条（多单位 28、商品信息 20、仓库信息 23）。剩下的是纯页面交互类
+（左侧菜单进入、分页器、列设置、Popover 位置、试用到期等），没有对应接口语义，只在 UI 层跑。
+
+```bash
+# 接口层全量（78 条含 7 条阻塞，实测约 3 分钟）
+./.venv/Scripts/python.exe run_cases.py run --layer api
+
+# 按模块 / 编号 / 标签
+./.venv/Scripts/python.exe run_cases.py run --layer api --module UNIT MAT
+./.venv/Scripts/python.exe run_cases.py run --layer api --only TC-DEP-017,TC-DEP-025
+
+# 看接口层的执行计划（78 条，含 7 条阻塞标注）
+./.venv/Scripts/python.exe run_cases.py list --layer api
+
+# 接口层的 Allure 报告同样可用
+./.venv/Scripts/python.exe run_cases.py run --layer api --allure auto
+```
+
+### 接口约定（写用例前必读）
+
+- 前缀 `/jshERP-boot`，认证只有一个请求头 `x-access-token`（39 位）；
+- **业务失败也返回 HTTP 200**，必须看响应体的 `code`：`200` 成功、`300` 查询异常、
+  `301` 写入异常、`500` 未知异常、`8000005` 业务提示；
+- 错误提示在 `data.message`，**不在**顶层 `message`；
+- 列表接口不传 `field` 会返回全字段（编辑时可直接拿列表行构造 body）；传了 `field` 就只返回这些列；
+- 删除/状态类沿用前端习惯：`ids` 形如 `"1,2,"`（每个 id 后面都带逗号），单条删除用 `{"id": x}`。
+
+`framework/api_client.py` 管传输和错误码解析，`apis/base.py` 管通用语义，用例里只写业务：
+
+| 方法 | 所在层 | 用途 |
+| --- | --- | --- |
+| `ok(...)` | client | 期望成功，非 200 业务码直接抛 `ApiError` |
+| `reject(...)` | client | 期望被拒绝，返回 `(code, message)`；真的成功了算失败 |
+| `code_msg(...)` | base | 把 `(HTTP 状态码, 响应体)` 归一成 `(业务码, 提示语)` |
+| `add_raw / update_raw` | 各 api | 原样提交，返回 `(业务码, 提示语)`，不预设成败 |
+| `find(...)` | 各 api | 按名称查单条（各模块匹配口径不同），用于断言落库结果 |
+| `all(...)` | base | 按搜索条件查一批 |
+| `ids_param(...)` | base | 拼 `"1,2,"` 形态的 ids 参数 |
+
+### 认证与 token
+
+首次从 MyTest 浏览器 localStorage 的 `pro__Access-Token` 取值并缓存到项目根 `.api_token`
+（已加 gitignore，**不要提交**），之后浏览器不开也能跑；token 失效会自动回源重取。
+
+token 打不开局面时会直接报错退出，不会静默跑成一片失败——接口层没有「等人工重新登录」这条路径，
+需要时先打开 MyTest 登录一次即可。
+
+### 数据纪律（接口层专属）
+
+三条和 UI 层一致（前缀命名、先记账再落库、绝不碰既有数据），接口层最要紧的两条：
+
+- 跑完按 **id 精确回收**：用例可能把名称改成 `null/(...)` 之类，按名字根本搜不到，必须用创建时记下的 id；
+- 「本应被拦截却成功了」的用例，**先回滚脏数据再判失败**（快照对比找出新增行再删），
+  避免脏数据污染后续用例，也避免把「后端没校验」误写成「脚本出错」。
+
+完整规则（含前缀兜底、回收后清账、回收前后比总数）见文末「测试数据纪律 → 接口层补充」。
+
+接口封装在 `apis/`（对标 `pages/`：`unit_api.py` / `material_api.py` / `depot_api.py`），
+用例在 `cases/a_unit.py`(28) / `a_material.py`(20) / `a_depot.py`(23)，
+HTTP 客户端在 `framework/api_client.py`，造数与回收在 `framework/api_context.py`。
+
+接口清单、请求体样例与实测校验口径见 [`docs/接口契约-多单位-商品-仓库.md`](docs/接口契约-多单位-商品-仓库.md)，
+其中记录了「UI 有红字拦截、后端其实没校验」的一系列缺陷（空表单建商品、重名仓库、删除被引用单位等）。
+
+### 重新采集接口
+
+页面改版或要覆盖新模块时用这三个工具，产物落在 `tools/api_dump/`（已 gitignore，1MB 左右）：
+
+```bash
+./.venv/Scripts/python.exe tools/api_recorder.py            # 只读：加载/查询/翻页/开关弹窗，不落库
+./.venv/Scripts/python.exe tools/api_recorder_write.py      # 写链路：测试前缀下跑完整 CRUD，抓 add/update/delete/状态
+./.venv/Scripts/python.exe tools/api_recorder_write.py unit depot product   # 只抓指定模块
+./.venv/Scripts/python.exe tools/api_probe_server.py        # 服务端校验行为探测：空值/缺字段/越界/重名
+```
+
+`api_recorder_write.py` 会真实造数据，但用的是本次运行前缀，跑完按前缀回收；
+`api_probe_server.py` 探测完会按登记过的 id 清理并自检残留——但探测过程可能造出「本应拦截却成功」
+的脏数据（例如名称被写坏的记录），自检发现异常就按提示手工补删。
+
 ## 报告
 
 一次运行出两份报告，分工明确：
@@ -93,9 +240,18 @@ Allure：reports/allure-report/20261103_182121.html
 | Markdown | `reports/run_<时间戳>.md` | 表格一览，贴进缺陷单 / 日报，CI 日志友好 |
 | **Allure** | `reports/allure-report/<时间戳>.html` | 交互式：按模块/标签分层、看步骤、看失败截图。文件名带时间戳，历史报告不覆盖 |
 
+两层报告同名同格式，靠**报告头的「执行层」**区分（`UI` / `接口`）：
+Markdown 第二行会写「执行层：接口（另有一层实现时，请分别执行）」，避免把接口结果误读成页面结果。
+
+> 同一编号两层都跑过时，`--update-xlsx` 会互相覆盖「执行结果」列（后跑的盖掉先跑的）。
+> 只想回填某一层的结论，就先只跑那一层再回填；要同时保留两层结论，建议一层回填一次、
+> 中间导出一次表，或者只在缺陷单里引用另一层的结果。
+
 Allure 默认生成**单文件**（数据内嵌在同一个 html 里），双击即可打开，不用起服务。
 
 ### Allure 里能看到什么
+
+UI 层：
 
 - 分层：`Suites` / `Behaviors` 按「一级模块 → 二级功能 → 标签 → 用例」排布，
   当前三个模块是：商品管理 → 多单位、商品管理 → 商品信息、**基础资料 → 仓库信息**；
@@ -105,6 +261,14 @@ Allure 默认生成**单文件**（数据内嵌在同一个 html 里），双击
 - 失败自动附**全页截图**；用例里 `ctx.note()` 记的偏差/缺陷候选会作为「观察记录」附件带上去；
 - 严重程度取自用例表优先级（高→critical、中→normal、低→minor），用例编号作为 tag 便于搜索；
 - Environment 区记录本次的域名、浏览器、数据前缀、执行范围。
+
+接口层：分层与严重程度同上，同样四段步骤（`前置：登录态检查` → `执行用例` → `收尾：页面复位` →
+`收尾：数据回收`），差别是：
+
+- 没有失败截图，「页面复位」是空实现（接口层没有页面状态要复位）；
+- 「前置」改成检查 token 能不能用，取不到就记「阻塞」而不是整批报错；
+- **不记录逐条请求明细**——接口层的失败原因直接把服务端的 `code` 和 `message` 写进说明列，
+  想看具体请求体去 Markdown 报告的说明列，或 `tools/api_dump/` 里的抓包原文。
 
 ### 状态映射
 
@@ -142,18 +306,21 @@ node tools/allure/node_modules/allure-commandline/bin/allure open reports/allure
 
 ```
 ERPgyjerp/
-├── run_cases.py                # 唯一执行入口：run / list 两个子命令
-├── config.py                   # 系统地址、CDP 端点、动作间隔
+├── run_cases.py                # 唯一执行入口：交互菜单 + run / list 子命令（--layer ui|api）
+├── config.py                   # 系统地址、CDP 端点、接口前缀、动作间隔
 ├── browser.py                  # 通过 CDP 接入桌面 MyTest 浏览器 + 登录态守卫
 ├── requirements.txt            # playwright / openpyxl / allure-python-commons
 ├── 管伊佳ERP-测试用例.xlsx      # 用例来源，也是 --update-xlsx 的回填目标（回填前自动备份）
+├── .api_token                  # 接口层 token 缓存（已 gitignore，不要提交）
 │
 ├── framework/                  # 与业务无关的执行骨架
-│   ├── registry.py             # 用例注册表（@case 注册，编号即执行顺序）
+│   ├── registry.py             # 用例注册表：@case 注册 UI 实现，@api_case 挂接口实现（同编号双轨）
 │   ├── asserts.py              # 断言：check / check_eq / check_contains / blocked
 │   ├── data.py                 # 测试数据工厂：运行前缀、命名、记账
-│   ├── context.py              # 用例工具箱：页面对象 + 造数 + reset / cleanup
-│   ├── runner.py               # 执行器：跑用例、收尾、报告、回填 Excel
+│   ├── context.py              # UI 用例工具箱：页面对象 + 造数 + reset / cleanup
+│   ├── runner.py               # 执行器：按 --layer 选实现、收尾、报告、回填 Excel
+│   ├── api_client.py           # 接口客户端：token 取用/缓存/回源、统一错误码解析
+│   ├── api_context.py          # 接口用例工具箱：apis 聚合 + 造数 + 按 id 精确回收
 │   └── allure_report.py        # Allure 写入（步骤/截图/标签）+ 调 CLI 生成 HTML
 │
 ├── pages/                      # 页面对象：只放选择器与页面交互，不含断言
@@ -162,72 +329,129 @@ ERPgyjerp/
 │   ├── product_page.py         # 商品信息：列表/查询/新增/编辑/复制/批量/多单位/列设置
 │   └── depot_page.py           # 仓库信息：增删改查 + 设为默认 + 启用禁用 + 负责人下拉
 │
+├── apis/                       # 接口封装（对标 pages/）：只组装请求与解析响应，不含断言
+│   ├── base.py                 # 公共基类：ok / reject / raw / find / all、ids 形态、错误码
+│   ├── unit_api.py             # 多单位：list / getAllList / add / update / batchSetStatus / delete
+│   ├── material_api.py         # 商品：list / add / update / 批量 / 条码 / 条码明细 / 类别树 / 属性
+│   └── depot_api.py            # 仓库：list / getAllListWithStock / add / update / 状态 / 删除 / 设为默认
+│
 ├── cases/                      # 用例：一个函数 = 一条用例，文件名按标签划分
 │   ├── _helpers.py             # 公共小工具：单位名拼接、提示文案匹配
-│   ├── c_entry.py              # 页面入口：UNIT 001-003
-│   ├── c_list.py               # 列表展示：UNIT 004/005/034/035/036
-│   ├── c_query.py              # 查询：UNIT 006-011
-│   ├── c_create.py             # 新增：UNIT 012-023/038/040/041/043
-│   ├── c_edit.py               # 编辑：UNIT 024/025
-│   ├── c_status.py             # 状态与批量：UNIT 026-029/039
-│   ├── c_delete.py             # 删除：UNIT 030-033
-│   ├── c_product.py            # 商品联动：UNIT 042（037/044 为人工登记）
-│   ├── c_material.py           # 商品信息：MAT 001-043
-│   └── c_depot.py              # 仓库信息：DEP 001-038
+│   ├── c_*.py                  # UI 层实现（c_entry / c_list / c_query / c_create / c_edit /
+│   │                           #   c_status / c_delete / c_product / c_material / c_depot）
+│   ├── a_unit.py               # 接口层：多单位 28 条
+│   ├── a_material.py           # 接口层：商品信息 20 条
+│   └── a_depot.py              # 接口层：仓库信息 23 条
+│
+├── docs/
+│   └── 接口契约-多单位-商品-仓库.md   # 接口清单、请求体样例、实测校验口径、覆盖情况
 │
 ├── tools/
 │   ├── probe.py                # 页面探查：dom / modal / product / depot
+│   ├── api_recorder.py         # 接口抓包（只读）：加载/查询/翻页，不落库
+│   ├── api_recorder_write.py   # 接口抓包（写链路）：测试前缀下跑完整 CRUD
+│   ├── api_probe_server.py     # 服务端校验行为探测：空值/缺字段/越界/重名
+│   ├── api_dump/               # 抓包产物 md + json（已 gitignore，可随时重采）
 │   └── allure/                 # 随项目安装的 allure-commandline（node_modules 不入库）
 │
 └── reports/                    # 运行产物（已 gitignore）
-    ├── run_<时间戳>.md          # 人读报告
-    ├── run_<时间戳>.json        # 结构化结果：运行前缀、汇总、逐条用例结果
+    ├── run_<时间戳>.md          # 人读报告（第二行标注执行层 UI / 接口）
+    ├── run_<时间戳>.json        # 结构化结果：执行层、运行前缀、汇总、逐条用例结果
     ├── allure-results/         # Allure 原始结果，每次运行前清空
     └── allure-report/          # <时间戳>.html 单文件报告，双击即可用浏览器打开
 ```
 
-> `framework/__init__.py`、`pages/__init__.py` 只有一行包说明 docstring，无逻辑；`--update-xlsx` 产生的备份
-> 落在同一目录，形如 `管伊佳ERP-测试用例.bak_<时间戳>.xlsx`。
+> `framework/__init__.py`、`pages/__init__.py`、`apis/__init__.py` 只有包说明 docstring，无逻辑；
+> `--update-xlsx` 产生的备份落在同一目录，形如 `管伊佳ERP-测试用例.bak_<时间戳>.xlsx`。
 
 ## 用例覆盖
 
-| 范围 | 条数 | 说明 |
-| --- | --- | --- |
-| 合计 | 125 | 多单位 44 + 商品信息 43 + 仓库信息 38 |
-| 可自动化 | 117 | 跑脚本即出结论，结果为 通过/失败（UNIT 40 / MAT 41 / DEP 36） |
-| 阻塞（人工） | 8 | 见下表，脚本会如实标注「阻塞」，不会假装通过 |
+| 范围 | 条数 | UI 层 | 接口层 | 说明 |
+| --- | --- | --- | --- | --- |
+| 合计 | 125 | 117 可自动 | 71 有实现 | 多单位 44 + 商品信息 43 + 仓库信息 38 |
+| 多单位 | 44 | 40 | 28 | |
+| 商品信息 | 43 | 41 | 20 | |
+| 仓库信息 | 38 | 36 | 23 | |
 
-阻塞原因：
+- **UI 层 117 条**：跑脚本即出结论，结果为 通过/失败；其余 8 条为阻塞（人工），见下表。
+- **接口层 71 条**：与 UI 层共用编号，实跑计划 78 条（含 7 条阻塞）。
+  其余 54 条没有接口版，都是纯页面交互（左侧菜单进入、分页器、列设置、Popover 位置、复制到新增等），
+  接口层面没有对应语义，`--layer api` 会自动跳过，不会算失败。
+
+阻塞原因（UI 层）：
 
 | 编号 | 原因 |
 | --- | --- |
 | TC-UNIT-033 | 需要「已被商品引用」的单位；删除确认若被服务端放行会真实删业务数据，自动化不做破坏性验证 |
 | TC-UNIT-036 | 说明型用例（顶部统计卡片属首页模块设计行为），无需断言，目视确认即可 |
 | TC-UNIT-037 | 前置条件为账号试用到期（当前显示 2026-11-08），无法在不改账号状态的前提下构造 |
-| TC-UNIT-044 | 依赖 TC-UNIT-033 与商品详情核对，同样涉及真实业务数据 |
+| TC-UNIT-044 | 依赖 TC-UNIT-033 与商品详情核对，同样涉及真实业务数据；**接口层例外**——用自己造的单位+商品即可安全验证，`--layer api` 下可跑 |
 | TC-MAT-037 | 需要一条被采购/销售单据引用的商品，构造前置会改动真实业务数据 |
 | TC-MAT-039 | 同 TC-UNIT-037，需账号试用到期 |
 | TC-DEP-033 | 需要「已被业务单据引用」的仓库；构造引用会改动真实单据数据，属破坏性前置 |
 | TC-DEP-037 | 同 TC-UNIT-037，需账号试用到期 |
 
-写用例的方式：
+接口层的 7 条阻塞就是上表除 `TC-UNIT-044` 之外的那 7 条（`TC-UNIT-033 / 036 / 037`、
+`TC-MAT-037 / 039`、`TC-DEP-033 / 037`）：依赖真实业务单据、需账号状态变更、说明型，原因原样带进报告。
+
+写用例的方式（同一个编号写两份实现，UI 打 `@case`，接口打 `@api_case`）：
 
 ```python
-from framework.registry import case
-from framework.asserts import check_eq, blocked
+from framework.registry import case, api_case
+from framework.asserts import check, check_eq, blocked
 
+# UI 层：走页面
 @case("TC-UNIT-013", "填写基本单位+副单位+比例保存", "新增", "高")
 def tc_unit_013(ctx):
     unit = ctx.open_unit()
     basic = ctx.new_unit([("箱", 10)])          # 造数据（自动记账、跑完回收）
     check_eq(unit.read_row(basic)["other"], f"箱=10{basic}", "副单位列")
+
+# 接口层：同一编号打接口，断言落库结果而不是界面
+@api_case("TC-UNIT-013")
+def tc_unit_013_api(ctx):
+    _uid, name, _row = ctx.new_unit([("箱", 10)])
+    row = ctx.unit.find(name)
+    check(row is not None, "新增后应能查到")
+    check_eq(str(row["ratio"]), "10", "比例应落库")
+    check_eq(row["otherUnit"], "箱", "副单位应落库")
 ```
+
+`@api_case` 只挂实现，标题/标签/优先级沿用 UI 层登记的，**两边口径天然一致**；
+纯接口新增的用例（没有 UI 版）才用 `@api_case(cid, title, tag, priority)` 自带元信息建一条。
 
 跑着跑着发现前置数据不具备（例如类别下拉是空的），用 `blocked("原因")` 主动记「阻塞」，
 而不是写成断言失败——报告里会归到「阻塞」，Allure 里是 skipped，原因原样带出去。
 条件不具备就跳过、不硬凑通过，条件不具备也别冤枉成缺陷。
 
 ## 实测发现（按最新一次全量）
+
+### 接口层（2026-11-05：54 通过 / 17 失败 / 7 阻塞 / 0 异常，78 条 196 秒）
+
+接口层最大价值：**把「前端拦住了」和「后端真拦住了」分开**。UI 上看到的红字大多是前端校验，
+绕过页面直接调接口，17 条用例暴露出后端根本没校验。按性质归类：
+
+| 性质 | 编号 | 实测 |
+| --- | --- | --- |
+| 接口被特殊字符打挂 | UNIT-011 / MAT-013 / DEP-011 | 查询条件含 emoji → HTTP 200 但 `code=300 数据查询异常`，三页全中 |
+| 必填校验缺失 | UNIT-015 / 016 / 017 / 018、MAT-015 / 016 / 017 | 空表单、缺基本单位、只填副单位、只填比例、比例 `-1`——全部 `code=200` 建成功 |
+| 唯一性只靠前端 | DEP-017 | 同名仓库 `code=200` 成功；`checkIsNameExist` 对已存在名称返回 `status:true`，但 `add` 接口自己不校验 |
+| 编辑静默失败 | MAT-028 / DEP-025 | 编辑清空名称返回 `200 成功`，服务端忽略空值不改库——数据没坏，但前端会误报成功 |
+| 编辑破坏数据 | UNIT-025 | 编辑清空基本单位返回 `200`，名称被写成 `null/(…)` 这类坏值，之后按名字搜不到 |
+| 删除漏依赖校验 | UNIT-044 | 单位已被商品引用，删除仍 `200` 成功，商品悬空（依赖校验只做在前端） |
+| 写入直接报错 | UNIT-014 | 填第三个副单位 → `code=301 数据写入异常`，第三个副单位存不进去 |
+| 精度校验缺失 | UNIT-038 | 比例填四位小数 `1.5555` 成功落库为 `1.556`，前端「最多三位小数」只拦 UI |
+
+对应的后端校验缺口，按页面归纳：
+
+| 页面 | 后端没校验的东西 | 前端表现 |
+| --- | --- | --- |
+| 多单位 | 基本单位必填、副单位与比例成对、比例正负、比例小数位、第三个副单位 | 前端有红字/toast，看起来拦住了 |
+| 商品信息 | 名称必填、单位必填、空表单 | 前端有红字，接口可空建 |
+| 仓库信息 | 名称唯一性、名称必填（编辑时） | 前端有 `checkIsNameExist`，但接口不拦 |
+
+> 这些结论都是实测出来的，不是推断。逐条的请求体与响应原文见
+> [`docs/接口契约-多单位-商品-仓库.md`](docs/接口契约-多单位-商品-仓库.md) 第 3 节。
 
 ### 多单位 + 商品信息（2026-11-01：78 通过 / 2 失败 / 7 阻塞 / 0 异常）
 
@@ -324,6 +548,18 @@ ERP_RELOGIN_WAIT=0   ./.venv/Scripts/python.exe run_cases.py   # 无人值守：
 
 登录页有图形验证码（`#inputCode`），所以无法自动登录——必须人工输入一次。
 
+### 接口层不同
+
+接口层**没有**「等你重新登录」这条路径：token 失效时 `ApiClient` 会先回源到浏览器重取一次，
+取不到（浏览器没开或也没登录）就直接抛错退出，不会用过期 token 硬跑成一片 `loginOut` 失败。
+
+```bash
+# token 缓存被清 / 服务端踢下线：开一次 MyTest 登录，再跑即可
+./.venv/Scripts/python.exe run_cases.py run --layer api
+```
+
+只跑接口层时不需要设 `ERP_RELOGIN_WAIT`，这个变量只对 UI 层生效。
+
 ## 动作间隔规则（强制）
 
 **每一次 UI 操作之后都要留出间隔，默认 1 秒**，避免脚本快过页面渲染和服务端校验。
@@ -379,3 +615,16 @@ ERP_ACTION_DELAY_MS=0    ./.venv/Scripts/python.exe run_cases.py  # 关闭间隔
 - 回收前会再校验「名称或基本单位含运行前缀」，**绝不按关键字删既有业务数据**；
 - 收尾按页面分三次走：多单位 → 商品信息 → 仓库信息，各自只在对应页面做模糊回收；
 - 断言按「基本单位」列做整格精确比较，同名多行用序号区分（TC-019）。
+
+### 接口层补充
+
+前缀命名与「先记账再落库」完全复用，回收策略更严一档：
+
+- **按 id 精确回收**，不靠名字。接口用例会把名称改坏（例如清空基本单位后名称变成
+  `null/(…)` 这类坏值），按前缀根本搜不到，只有创建时记下的 id 靠得住；
+- 两条路径：先按记账的 id 逐个/批量删，**再按运行前缀兜底扫一遍**
+  （覆盖「创建成功但当时没拿到 id」的情况），兜底时同样校验名称含本次前缀；
+- **「本应被拦截却成功」先回滚再判失败**：提交前拍一次 id 快照，成功后对比出新增行逐个删除，
+  再把该用例判为失败。这样既不会留下脏数据，也不会把「后端没校验」误记成「脚本异常」；
+- 回收后清账（`created` 清空），避免后续 cleanup 重复删已删的 id、把回收条数算虚；
+- 回收前后各查一次总数，实跑后基线应与跑前完全一致（本次为 多单位 24 / 仓库 0 / 商品 3）。

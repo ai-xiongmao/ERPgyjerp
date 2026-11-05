@@ -20,6 +20,9 @@ CDP_ENDPOINT = "http://127.0.0.1:9231"
 # 页面里识别目标业务系统的 URL 关键字
 APP_URL_KEYWORD = "gyjerp"
 
+# 后端接口统一前缀（jshERP 的 Spring Boot 服务挂在 /jshERP-boot 下）
+API_PREFIX = "/jshERP-boot"
+
 # Playwright 默认元素等待超时（毫秒）
 DEFAULT_TIMEOUT = 15000
 
