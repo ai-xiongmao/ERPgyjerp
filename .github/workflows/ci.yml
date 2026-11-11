@@ -24,6 +24,13 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 15
 
+    # 英文 Windows runner 的管道默认码页是 cp1252，打中文直接 UnicodeEncodeError。
+    # gate.py / check_boundaries.py 内部已经自己钉 UTF-8，这里再兜一层，
+    # 顺带让 pip 和 ruff 的输出也保持可读。
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: utf-8
+
     steps:
       - uses: actions/checkout@v4
 

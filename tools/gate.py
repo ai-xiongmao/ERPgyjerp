@@ -32,6 +32,19 @@ ROOT = Path(__file__).resolve().parent.parent
 BASELINE = ROOT / "docs" / "case_counts.json"
 PY = sys.executable
 
+# Windows 上「非控制台」输出（CI 的管道、重定向到文件）默认用系统 ANSI 码页：
+# 中文机器是 cp936 能打中文，英文 runner 是 cp1252，第一句中文 print 就
+# UnicodeEncodeError 直接崩，且只留下 exit code 1，看不出任何原因。
+# 这里把本进程的输出流钉成 UTF-8，子进程靠 _run() 里的 PYTHONIOENCODING 传递。
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:  # noqa: BLE001 - 老版本或已重定向的流，忽略即可
+        pass
+
+# 传给所有子进程：保证它们也不受宿主码页影响
+CHILD_ENV = dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONUTF8="1")
+
 _DUMP = r"""
 import json, sys
 sys.path.insert(0, r"%s")
@@ -59,7 +72,8 @@ class Step:
 
 def _run(cmd, timeout=600):
     return subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True,
-                          encoding="utf-8", errors="replace", timeout=timeout)
+                          encoding="utf-8", errors="replace", timeout=timeout,
+                          env=CHILD_ENV)
 
 
 def step_ruff(s: Step):
@@ -130,7 +144,7 @@ def _free_port():
 
 def step_dashboard(s: Step, expected_total=None):
     port = _free_port()
-    env = dict(os.environ)
+    env = dict(CHILD_ENV)
     # 指向必然连不上的回环端口：让探测快速失败，不依赖外网，也不受代理影响
     env.update({"ERP_DASH_PORT": str(port),
                 "ERP_BASE_URL": "http://127.0.0.1:1",

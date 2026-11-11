@@ -29,8 +29,22 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 BASELINE = ROOT / "docs" / "boundary_baseline.json"
 
-SKIP_DIRS = {".venv", "__pycache__", ".git", "reports", "node_modules", ".cache", "api_dump"}
+# 非源码目录：虚拟环境/缓存/产物。少一个都会让「文件行数」这项指标暴涨，
+# 例如有人把 venv 建成仓库内的 .ci —— 157 个「超 500 行文件」全在 site-packages 里。
+SKIP_DIRS = {
+    ".venv", "venv", "env", ".tox", ".eggs", "site-packages", "build", "dist",
+    "__pycache__", ".git", ".ruff_cache", ".mypy_cache", ".pytest_cache",
+    "reports", "node_modules", ".cache", "api_dump",
+}
 BIG_FILE_LIMIT = 500
+
+# 在英文 Windows（CI runner）上，管道输出的默认码页是 cp1252，打印下面的中文会
+# UnicodeEncodeError 崩掉，且只留 exit code 1。统一钉成 UTF-8。
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:  # noqa: BLE001 - 老版本或已重定向的流
+        pass
 
 # P2 会把 cases/ 重命名为 tests/ 并按模块分目录，届时这里同步改一处即可
 CASE_DIR = ROOT / "cases"
