@@ -88,6 +88,7 @@ class DepotPage(TablePage):
                  "manager", "remark", "sort", "status", "isDefault")
     NAME_KEY = "name"
     NAME_LABEL = "仓库"
+    MENU_GROUP = "基础资料"      # 左侧一级菜单
 
     # 主查询框 + 重置时要一并清空的其它查询框
     SEARCH_INPUT = NAME_INPUT

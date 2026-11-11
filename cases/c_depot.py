@@ -17,12 +17,10 @@
     - 排序字段自由文本无校验。
 """
 
-import time
 
 from config import BASE_URL
 from framework.asserts import blocked, check, check_contains, check_eq, check_in
 from framework.registry import case, manual
-from pages.base_page import spaced
 
 NO_SELECT_MSG = "请选择一条记录！"
 NO_NAME_MSG = "请输入仓库名称!"
@@ -39,50 +37,32 @@ EXPECTED_TOOLBAR = ["新增", "删除", "启用", "禁用"]
 @case("TC-DEP-001", "通过左侧菜单进入仓库信息页面", "页面入口", "高")
 def tc_dep_001(ctx):
     """展开「基础资料」→ 点「仓库信息」，校验地址/标题/菜单高亮。"""
-    page = ctx.page
-    page.goto(BASE_URL + "/dashboard/analysis", wait_until="domcontentloaded")
-    page.wait_for_timeout(2000)
+    depot = ctx.depot.enter_via_menu()
+    page = depot.page
 
-    submenu = page.locator(".ant-menu-submenu").filter(has_text="基础资料").first
-    submenu.wait_for(state="visible", timeout=15000)
-    if "ant-menu-submenu-open" not in (submenu.get_attribute("class") or ""):
-        submenu.locator(".ant-menu-submenu-title").first.click()
-        ctx.depot.pause()
+    check((page.url or "").rstrip("/").endswith("/system/depot"), f"进入后地址不符：{page.url}")
 
-    link = page.locator('.ant-menu-item a[href="/system/depot"]').first
-    link.wait_for(state="visible", timeout=10000)
-    link.click()
-    page.wait_for_timeout(1200)
-    ctx.depot._wait_table_loaded()
-
-    check((page.url or "").rstrip("/").endswith("/system/depot"),
-          f"进入后地址不符：{page.url}")
-
-    # SPA 路由切换后 document.title 是异步更新的，轮询一下再断言
-    deadline = time.time() + 10
-    title = page.title().strip()
-    while time.time() < deadline and title != "仓库信息 · 管伊佳ERP":
-        page.wait_for_timeout(300)
-        title = page.title().strip()
+    # 与多单位/商品页一致的已知行为：SPA 菜单跳转不更新 document.title
+    title = depot.wait_title("仓库信息 · 管伊佳ERP")
     if title != "仓库信息 · 管伊佳ERP":
-        # 与多单位/商品页一致的已知行为：SPA 菜单跳转不更新 document.title
-        ctx.note(f"偏差：菜单进入后浏览器标题未更新（{title!r}）；直接访问 /system/depot 才是「仓库信息 · 管伊佳ERP」")
+        ctx.note(
+            f"偏差：菜单进入后浏览器标题未更新（{title!r}）；"
+            "直接访问 /system/depot 才是「仓库信息 · 管伊佳ERP」"
+        )
 
-    active = [t.strip() for t in page.locator(".ant-menu-item-selected").all_inner_texts()]
-    check_in("仓库信息", active, "左侧菜单高亮项")
+    check_in("仓库信息", depot.active_menu_items(), "左侧菜单高亮项")
 
 
 @case("TC-DEP-002", "直接通过 URL 打开仓库信息页面", "页面入口", "中")
 def tc_dep_002(ctx):
     """地址栏直接访问 /system/depot，不应要求重新登录。"""
     page = ctx.page
-    ctx.depot.open()
+    depot = ctx.depot.open()
     check_eq((page.url or "").rstrip("/").split("?")[0],
              BASE_URL + "/system/depot", "当前地址")
     check("login" not in (page.url or "").lower(), f"被重定向到登录页：{page.url}")
-    active = [t.strip() for t in page.locator(".ant-menu-item-selected").all_inner_texts()]
-    check_in("仓库信息", active, "左侧菜单高亮项")
-    check(page.locator(".ant-table").count() >= 1, "表格组件应渲染完成")
+    check_in("仓库信息", depot.active_menu_items(), "左侧菜单高亮项")
+    check(depot.has_table(), "表格组件应渲染完成")
 
 
 @case("TC-DEP-003", "页面结构与元素完整性校验", "页面入口", "高")
@@ -101,13 +81,11 @@ def tc_dep_003(ctx):
     for text in ("查询", "重置"):
         check(depot.button(text).count() >= 1, f"查询区缺少「{text}」按钮")
 
-    toolbar = [t.replace(" ", "") for t in
-               depot.page.locator(depot.BUTTON_SCOPE).all_inner_texts()]
+    toolbar = depot.toolbar_labels()
     for text in EXPECTED_TOOLBAR:
         check_in(text, toolbar, "工具栏按钮")
 
-    headers = [h.strip() for h in depot.page.locator(".ant-table-thead th").all_inner_texts()]
-    check_eq(headers, EXPECTED_HEADERS, "表头列序")
+    check_eq(depot.table_headers(), EXPECTED_HEADERS, "表头列序")
 
 
 # ==================== 列表展示 ====================
@@ -643,10 +621,7 @@ def tc_dep_031(ctx):
     depot.clear_selection()
     depot.select_row(name)
     depot.click_toolbar("删除")
-    dialog = depot.confirm_dialog()
-    dialog.wait_for(state="visible", timeout=8000)
-    dialog.locator("button").filter(has_text=spaced("取消")).first.click()
-    depot.pause()
+    depot.cancel_confirm()
 
     check(depot.has_row(name), "取消后记录应保留")
     check_eq(depot.total_count(), total, "取消后总数不应变化")

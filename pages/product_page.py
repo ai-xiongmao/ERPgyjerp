@@ -52,6 +52,10 @@ COL_SALE = 13      # 销售价
 COL_LOWEST = 14    # 最低售价
 COL_STATUS = 15    # 状态
 
+# AntD 下拉展开后渲染在 body 上，:visible 用来排除已关闭但仍留在 DOM 里的那几个
+SELECT_DROPDOWN_OPTION = ".ant-select-dropdown:visible .ant-select-dropdown-menu-item"
+COLUMN_SETTINGS_POPOVER = ".ant-popover:visible"
+
 ROWS_JS = """() => Array.from(document.querySelectorAll('.ant-table-tbody tr.ant-table-row'))
     .map(tr => {
         const cells = Array.from(tr.children).map(td => (td.innerText || '').trim());
@@ -73,10 +77,28 @@ class ProductPage(TablePage):
                  "unit", "stock", "purchase", "retail", "sale", "lowest", "status")
     NAME_KEY = "name"
     NAME_LABEL = "名称"
+    MENU_GROUP = "商品管理"      # 左侧一级菜单
 
     # 主查询框 + 重置时要一并清空的其它查询框
     SEARCH_INPUT = KEYWORD_INPUT
     SEARCH_EXTRA_INPUTS = (SPEC_INPUT,)
+
+    # 新增/编辑弹窗内的表单字段：id 由 AntD Form 依字段名生成，前端改字段名就失效，
+    # 所以只在这里写一次。用例侧统一用 field("standard") 取定位器，不要写裸 id。
+    FORM_FIELDS = {
+        "name": "#name",
+        "unit": "#unit",
+        "standard": "#standard",     # 规格
+        "model": "#model",
+        "color": "#color",
+        "brand": "#brand",
+        "remark": "#remark",
+        "manufacturer": "#manufacturer",   # 制造商
+    }
+
+    def field(self, key):
+        """弹窗内某个表单字段的定位器，key 见 FORM_FIELDS。"""
+        return self.modal().locator(self.FORM_FIELDS[key])
 
     # ================= 查询 =================
     def search_spec(self, spec):
@@ -92,6 +114,36 @@ class ProductPage(TablePage):
             btn.first.click()
             self.pause()
         return self
+
+    def collapse_query(self):
+        """收起高级查询区（若当前是展开状态）。"""
+        btn = self.page.locator(".ant-card:has(.ant-table) a, .ant-card:has(.ant-table) button").filter(has_text="收起")
+        if btn.count():
+            btn.first.click()
+            self.pause()
+        return self
+
+    def category_select(self):
+        """查询区「请选择类别」下拉（不是表单里的类别字段）。"""
+        return self.page.locator(".ant-card:has(.ant-table) .ant-select").filter(
+            has_text="请选择类别").first
+
+    def category_options(self):
+        """点开类别下拉并返回选项文字；不改动查询条件。"""
+        self.category_select().click()
+        self.page.wait_for_timeout(600)
+        return [t.strip() for t in
+                self.page.locator(SELECT_DROPDOWN_OPTION).all_inner_texts() if t.strip()]
+
+    def pick_category(self):
+        """选中类别下拉里第一项并查询，返回被选中的类别名。"""
+        option = self.page.locator(SELECT_DROPDOWN_OPTION).first
+        picked = (option.inner_text() or "").strip()
+        option.click()
+        self.page.wait_for_timeout(300)
+        self.click_button("查询")
+        self._wait_table_loaded()
+        return picked
 
     # ================= 新增 / 编辑 / 复制弹窗 =================
     def open_copy_modal(self, name, nth=0):
@@ -227,3 +279,18 @@ class ProductPage(TablePage):
                 .map(t => (t.innerText || '').trim()).filter(Boolean);
             return ths;
         }""")
+
+    def insert_row_button(self):
+        """弹窗内的「插入行」按钮（新增弹窗里两个 primary，只能按文案区分）。"""
+        return self.modal().locator("button").filter(has_text="插入行")
+
+    def active_tab_text(self):
+        """当前 Tab 面板的可见文字。"""
+        return self.modal().locator(".ant-tabs-tabpane-active").first.inner_text()
+
+    # ================= 列设置 =================
+    def open_column_settings(self):
+        """点工具栏「列设置」，返回弹出的配置浮层。"""
+        self.click_toolbar("列设置")
+        self.page.wait_for_timeout(800)
+        return self.page.locator(COLUMN_SETTINGS_POPOVER)

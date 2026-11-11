@@ -222,6 +222,18 @@ class BasePage:
             pass
         return self
 
+    def cancel_confirm(self, wait_visible=8000):
+        """点确认框的「取消」。
+
+        这里**不等待框关闭**：取消是否真的生效，由用例接着断言数据/总数来判定，
+        提前等会把这个断言的时机吃掉（等不到还会静默超时 12 秒）。
+        """
+        dialog = self.confirm_dialog()
+        dialog.wait_for(state="visible", timeout=wait_visible)
+        dialog.locator("button").filter(has_text=spaced("取消")).first.click()
+        self.pause()
+        return self
+
     # ---------------- 收尾 ----------------
     def close_overlays(self, limit=4):
         """关掉所有挡路的浮层：确认框 → Popconfirm → 普通弹窗。"""

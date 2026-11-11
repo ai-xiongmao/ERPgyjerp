@@ -17,7 +17,6 @@ import time
 from config import BASE_URL
 from framework.asserts import blocked, check, check_contains, check_eq, check_in
 from framework.registry import case, manual
-from pages.base_page import spaced
 
 NO_SELECT_MSG = "请选择一条记录！"
 NO_NAME_MSG = "请输入名称!"
@@ -36,55 +35,35 @@ EXPECTED_TOOLBAR = ["新增", "删除", "启用", "禁用", "导入", "导出",
 @case("TC-MAT-001", "通过左侧菜单进入商品信息页面", "页面入口", "高")
 def tc_mat_001(ctx):
     """展开「商品管理」→ 点「商品信息」，校验地址/标题/菜单高亮。"""
-    page = ctx.page
-    page.goto(BASE_URL + "/dashboard/analysis", wait_until="domcontentloaded")
-    page.wait_for_timeout(2000)
-
-    submenu = page.locator(".ant-menu-submenu").filter(has_text="商品管理").first
-    submenu.wait_for(state="visible", timeout=15000)
-    if "ant-menu-submenu-open" not in (submenu.get_attribute("class") or ""):
-        submenu.locator(".ant-menu-submenu-title").first.click()
-        ctx.product.pause()
-
-    link = page.locator('.ant-menu-item a[href="/material/material"]').first
-    link.wait_for(state="visible", timeout=10000)
-    link.click()
-    page.wait_for_timeout(1200)
-    ctx.product._wait_table_loaded()
+    product = ctx.product.enter_via_menu()
+    page = product.page
 
     check((page.url or "").rstrip("/").endswith("/material/material"),
           f"进入后地址不符：{page.url}")
 
-    # SPA 路由切换后 document.title 是异步更新的，轮询一下再断言
-    deadline = time.time() + 10
-    title = page.title().strip()
-    while time.time() < deadline and title != "商品信息 · 管伊佳ERP":
-        page.wait_for_timeout(300)
-        title = page.title().strip()
+    # 已知系统行为：SPA 菜单跳转不更新 document.title（直接开 URL 才会变）。
+    # 标题正确性由 TC-MAT-002 覆盖；这里只记录偏差，不据此判红，
+    # 否则用例会因系统既有行为永久失败，掩盖真正的回归。
+    title = product.wait_title("商品信息 · 管伊佳ERP")
     if title != "商品信息 · 管伊佳ERP":
-        # 已知系统行为：SPA 菜单跳转不更新 document.title（直接开 URL 才会变）。
-        # 标题正确性由 TC-MAT-002 覆盖；这里只记录偏差，不据此判红，
-        # 否则用例会因系统既有行为永久失败，掩盖真正的回归。
         ctx.note(
             f"偏差：菜单进入后浏览器标题未更新（{title!r}）；"
             "直接访问 /material/material 才是「商品信息 · 管伊佳ERP」"
         )
 
-    active = [t.strip() for t in page.locator(".ant-menu-item-selected").all_inner_texts()]
-    check_in("商品信息", active, "左侧菜单高亮项")
+    check_in("商品信息", product.active_menu_items(), "左侧菜单高亮项")
 
 
 @case("TC-MAT-002", "直接通过 URL 打开商品信息页面", "页面入口", "中")
 def tc_mat_002(ctx):
     """地址栏直接访问 /material/material，不应要求重新登录。"""
     page = ctx.page
-    ctx.product.open()
+    product = ctx.product.open()
     check_eq((page.url or "").rstrip("/").split("?")[0],
              BASE_URL + "/material/material", "当前地址")
     check("login" not in (page.url or "").lower(), f"被重定向到登录页：{page.url}")
-    active = [t.strip() for t in page.locator(".ant-menu-item-selected").all_inner_texts()]
-    check_in("商品信息", active, "左侧菜单高亮项")
-    check(page.locator(".ant-table").count() >= 1, "表格组件应渲染完成")
+    check_in("商品信息", product.active_menu_items(), "左侧菜单高亮项")
+    check(product.has_table(), "表格组件应渲染完成")
 
 
 @case("TC-MAT-003", "页面结构与元素完整性校验", "页面入口", "高")
@@ -103,13 +82,11 @@ def tc_mat_003(ctx):
     for text in ("查询", "重置"):
         check(product.button(text).count() >= 1, f"查询区缺少「{text}」按钮")
 
-    toolbar = [t.replace(" ", "") for t in
-               product.page.locator(product.BUTTON_SCOPE).all_inner_texts()]
+    toolbar = product.toolbar_labels()
     for text in EXPECTED_TOOLBAR:
         check_in(text, toolbar, "工具栏按钮")
 
-    headers = [h.strip() for h in product.page.locator(".ant-table-thead th").all_inner_texts()]
-    check_eq(headers, EXPECTED_HEADERS, "表头列序")
+    check_eq(product.table_headers(), EXPECTED_HEADERS, "表头列序")
 
 
 # ==================== 列表展示 ====================
@@ -217,7 +194,7 @@ def tc_mat_009(ctx):
     name = ctx.new_material(unit="个")
     # 编辑补规格
     product.open_edit_modal(name)
-    product.fill(product.modal().locator("#standard"), "测试规格XYZ")
+    product.fill(product.field("standard"), "测试规格XYZ")
     product.save_success()
 
     product.search_spec("测试规格XYZ")
@@ -232,13 +209,8 @@ def tc_mat_010(ctx):
     """类别下拉选择后查询命中该类别的商品。"""
     product = ctx.product.open()
     # 类别下拉在当前数据下可能无选项；至少验证下拉可点开且不报错
-    category_select = product.page.locator(".ant-card:has(.ant-table) .ant-select").filter(
-        has_text="请选择类别").first
-    check(category_select.count() >= 1, "应有「请选择类别」下拉")
-    category_select.click()
-    product.page.wait_for_timeout(600)
-    options = [t.strip() for t in product.page.locator(
-        ".ant-select-dropdown:visible .ant-select-dropdown-menu-item").all_inner_texts() if t.strip()]
+    check(product.category_select().count() >= 1, "应有「请选择类别」下拉")
+    options = product.category_options()
     ctx.note(f"类别下拉选项：{options[:10]}")
     # 类别表当前为空（0 条），「按类别查询命中」这一层验证不了。
     # 记「阻塞（前置不具备）」而不是「失败」——产品本身没毛病，是环境缺数据。
@@ -246,14 +218,9 @@ def tc_mat_010(ctx):
         blocked("商品类别为空（商品管理→商品类别 0 条），无法验证「按类别查询命中」；"
                 "需先在商品类别里建数据再跑本条")
 
-    picked = options[0]
-    product.page.locator(
-        ".ant-select-dropdown:visible .ant-select-dropdown-menu-item").first.click()
-    product.page.wait_for_timeout(300)
-    product.click_button("查询")
-    product._wait_table_loaded()
+    picked = product.pick_category()
     ctx.note(f"按类别「{picked}」查询完成，当前页 {product.row_count()} 行")
-    check(product.page.locator(".ant-table").count() >= 1, "按类别查询后表格应正常渲染")
+    check(product.has_table(), "按类别查询后表格应正常渲染")
 
 
 @case("TC-MAT-011", "展开后高级查询字段", "查询", "中")
@@ -272,12 +239,7 @@ def tc_mat_011(ctx):
         check_in(expected, inputs, f"展开后应有「{expected}」字段")
 
     # 收起
-    collapse = product.page.locator(
-        ".ant-card:has(.ant-table) a, .ant-card:has(.ant-table) button"
-    ).filter(has_text="收起")
-    if collapse.count():
-        collapse.first.click()
-        product.pause()
+    product.collapse_query()
     ctx.note("展开/收起交互正常")
 
 
@@ -422,11 +384,10 @@ def tc_mat_019(ctx):
 
     product.open_create_modal()
     product.fill_basic(name, "个")
-    modal = product.modal()
-    product.fill(modal.locator("#standard"), "规格A")
-    product.fill(modal.locator("#model"), "型号B")
-    product.fill(modal.locator("#color"), "红色")
-    product.fill(modal.locator("#brand"), "品牌C")
+    product.fill(product.field("standard"), "规格A")
+    product.fill(product.field("model"), "型号B")
+    product.fill(product.field("color"), "红色")
+    product.fill(product.field("brand"), "品牌C")
     # 助记码由系统按名称自动生成拼音（readonly），不手动填
     product.save_success()
     product.wait_row(name, present=True)
@@ -443,13 +404,13 @@ def tc_mat_020(ctx):
     product = ctx.product.open()
     product.open_create_modal()
 
-    check(product.modal().locator("#unit").count() == 1, "初始应有自由输入的单位框")
+    check(product.field("unit").count() == 1, "初始应有自由输入的单位框")
     product.enable_multi_unit()
-    check(product.modal().locator("#unit").count() == 0, "勾选多单位后 #unit 输入框应消失")
+    check(product.field("unit").count() == 0, "勾选多单位后 #unit 输入框应消失")
     check_eq(product.multi_unit_select().count(), 1, "应出现「选择多单位」下拉")
 
     product.disable_multi_unit()
-    check(product.modal().locator("#unit").count() == 1, "取消勾选后应恢复自由输入")
+    check(product.field("unit").count() == 1, "取消勾选后应恢复自由输入")
     product.cancel()
 
 
@@ -487,8 +448,7 @@ def tc_mat_022(ctx):
     for expected in ("条码", "单位", "采购价", "零售价", "销售价", "最低售价"):
         check_in(expected, headers, "条码表格表头")
 
-    check(product.modal().locator("button").filter(has_text="插入行").count() >= 1,
-          "应有「插入行」按钮")
+    check(product.insert_row_button().count() >= 1, "应有「插入行」按钮")
     product.cancel()
 
 
@@ -499,13 +459,12 @@ def tc_mat_023(ctx):
     product.open_create_modal()
     product.switch_tab("库存数量")
 
-    pane_text = product.modal().locator(".ant-tabs-tabpane-active").first.inner_text()
+    pane_text = product.active_tab_text()
     for expected in ("仓库", "期初库存数量", "最低安全库存数量", "最高安全库存数量"):
         check_in(expected, pane_text, "库存数量 Tab 表头")
     check_in("暂无数据", pane_text, "初始应为暂无数据")
 
-    check(product.modal().locator("button").filter(has_text="插入行").count() >= 1,
-          "应有「插入行」按钮")
+    check(product.insert_row_button().count() >= 1, "应有「插入行」按钮")
     product.cancel()
 
 
@@ -516,7 +475,7 @@ def tc_mat_024(ctx):
     product.open_create_modal()
     product.switch_tab("图片信息")
 
-    pane_text = product.modal().locator(".ant-tabs-tabpane-active").first.inner_text()
+    pane_text = product.active_tab_text()
     check_in("图片最多4张", pane_text, "应有图片数量限制提示")
     check_in("不超过1M", pane_text, "应有单张大小限制提示")
     product.cancel()
@@ -577,7 +536,7 @@ def tc_mat_027(ctx):
     check_eq(state["name"], name, "回显的名称")
     check_eq(state["unit"], "个", "回显的单位")
 
-    product.fill(product.modal().locator("#standard"), "新规格123")
+    product.fill(product.field("standard"), "新规格123")
     product.save_success()
     check_eq(product.read_row(name)["spec"], "新规格123", "修改后的规格列")
 
@@ -605,7 +564,7 @@ def tc_mat_029(ctx):
     name = ctx.new_material(unit="个")
 
     product.open_edit_modal(name)
-    product.fill(product.modal().locator("#standard"), "要丢弃的规格")
+    product.fill(product.field("standard"), "要丢弃的规格")
     product.cancel()
     check(not product.modal_visible(), "取消后弹窗应关闭")
     check_eq(product.read_row(name)["spec"], "", "取消后规格不应变化")
@@ -726,10 +685,7 @@ def tc_mat_036(ctx):
     product.clear_selection()
     product.select_row(name)
     product.click_toolbar("删除")
-    dialog = product.confirm_dialog()
-    dialog.wait_for(state="visible", timeout=8000)
-    dialog.locator("button").filter(has_text=spaced("取消")).first.click()
-    product.pause()
+    product.cancel_confirm()
 
     check(product.has_row(name), "取消后记录应保留")
     check_eq(product.total_count(), total, "取消后总数不应变化")
@@ -848,7 +804,7 @@ def tc_mat_042(ctx):
         check_in(expected, labels, "批量编辑字段")
 
     # 修改颜色后保存：批量保存会先弹「确认操作 / 是否操作选中的N条数据?」
-    product.fill(product.modal().locator("#color"), "批量色")
+    product.fill(product.field("color"), "批量色")
     title, content = product.save_batch()
     check_eq(title, "确认操作", "批量保存确认框标题")
     check_in("是否操作选中的", content, "批量保存确认框正文")
@@ -860,14 +816,12 @@ def tc_mat_042(ctx):
 def tc_mat_043(ctx):
     """列设置弹出列显隐配置列表，含「恢复默认」。"""
     product = ctx.product.open()
-    product.click_toolbar("列设置")
-    product.page.wait_for_timeout(800)
+    popover = product.open_column_settings()
 
-    popover = product.page.locator(".ant-popover:visible")
     check(popover.count() >= 1, "应弹出列设置浮层")
     text = popover.first.inner_text()
     for expected in ("条码", "名称", "单位", "库存", "状态", "恢复默认"):
         check_in(expected, text, "列设置项")
 
     product.page.keyboard.press("Escape")
-    product.page.wait_for_timeout(300)
+    product.pause(300)

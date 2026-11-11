@@ -73,6 +73,7 @@ class UnitPage(TablePage):
     READ_KEYS = ("seq", "name", "basic", "other", "other2", "other3", "status")
     NAME_KEY = "basic"          # 行身份是多单位自己的「基本单位」列
     NAME_LABEL = "基本单位"
+    MENU_GROUP = "商品管理"      # 左侧一级菜单
 
     # (单位输入框, 比例输入框)；第 1 组是基本单位，没有比例
     UNIT_FIELDS = (

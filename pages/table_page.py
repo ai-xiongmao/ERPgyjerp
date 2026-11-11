@@ -84,6 +84,17 @@ class TablePage(BasePage):
     EMPTY = ".ant-empty-description, .ant-empty"
     SAVE_FAILURE_HINTS = SAVE_FAILURE_HINTS
 
+    # 左侧一级菜单文案（enter_via_menu 用），如「商品管理」「基础资料」
+    MENU_GROUP = ""
+
+    # ---- 页面骨架选择器（结构校验类用例共用的断言对象）----
+    DASHBOARD_PATH = "/dashboard/analysis"
+    MENU_SUBMENU = ".ant-menu-submenu"
+    MENU_SUBMENU_TITLE = ".ant-menu-submenu-title"
+    MENU_SELECTED = ".ant-menu-item-selected"
+    TABLE_HEADERS = ".ant-table-thead th"
+    TABLE = ".ant-table"
+
     # ================= 导航 =================
     def open(self):
         """确保登录态可用、停在目标页面，且表格首屏数据已经加载完。"""
@@ -115,6 +126,60 @@ class TablePage(BasePage):
                 break
             self.page.wait_for_timeout(200)
         self.page.wait_for_timeout(400)
+
+    def enter_via_menu(self, href=None):
+        """模拟真实用户路径：工作台 → 展开左侧一级菜单 → 点子菜单进入本页。
+
+        与 open() 的区别是**不改地址栏**，走 SPA 路由跳转——这是「从菜单能否正常进入」
+        这类用例要验证的东西，直接 goto 会绕过路由与菜单渲染。
+
+        不在这里做登录态探活：目标页是否渲染出来，由随后的表格等待与断言暴露。
+        """
+        href = href or self.PATH
+        self.goto(BASE_URL + self.DASHBOARD_PATH, wait_after=2000)
+
+        group = self.page.locator(self.MENU_SUBMENU).filter(has_text=self.MENU_GROUP).first
+        group.wait_for(state="visible", timeout=15000)
+        # 一级菜单可能已展开（上一条用例留下的状态），已展开再点会收起
+        if "ant-menu-submenu-open" not in (group.get_attribute("class") or ""):
+            group.locator(self.MENU_SUBMENU_TITLE).first.click()
+            self.pause()
+
+        link = self.page.locator(f'.ant-menu-item a[href="{href}"]').first
+        link.wait_for(state="visible", timeout=10000)
+        link.click()
+        self.page.wait_for_timeout(1200)
+        self._wait_table_loaded()
+        return self
+
+    def wait_title(self, expected, timeout=10.0):
+        """等 document.title 变成 expected，返回实际值。
+
+        SPA 路由切换后标题是异步更新的；已知该系统经菜单跳转时**不更新** title，
+        所以这里只返回实际值、由用例决定是判红还是记偏差。
+        """
+        deadline = time.time() + timeout
+        title = self.page.title().strip()
+        while time.time() < deadline and title != expected:
+            self.page.wait_for_timeout(300)
+            title = self.page.title().strip()
+        return title
+
+    # ================= 页面骨架（结构校验用）=================
+    def active_menu_items(self):
+        """左侧菜单当前高亮项的文字列表。"""
+        return [t.strip() for t in self.page.locator(self.MENU_SELECTED).all_inner_texts()]
+
+    def table_headers(self):
+        """表头单元格文字列表（按列序）。"""
+        return [h.strip() for h in self.page.locator(self.TABLE_HEADERS).all_inner_texts()]
+
+    def has_table(self):
+        return self.page.locator(self.TABLE).count() >= 1
+
+    def toolbar_labels(self):
+        """工具栏按钮文字，去掉 AntD 两个汉字的自动空格（「新 增」→「新增」）。"""
+        return [t.replace(" ", "") for t in self.page.locator(self.BUTTON_SCOPE).all_inner_texts()]
 
     # ================= 列表读取 =================
     def rows_data(self):

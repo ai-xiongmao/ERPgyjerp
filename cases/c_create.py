@@ -213,7 +213,9 @@ def tc_unit_020(ctx):
     unit.fill_form(special, [("箱", 10)])
     ctx.data.track(special)
     unit.click_save()
-    unit.page.wait_for_timeout(500)
+    # 保存请求的后端响应时间不可知，这里只能给个短窗口再看弹窗是否还在；
+    # 走 pause() 而不是裸 wait_for_timeout，是为了让动作间隔统一受 config 控制。
+    unit.pause(500)
     if unit.modal_visible():
         unit.cancel_modal()
         ctx.note("emoji/引号名称被拦截")
