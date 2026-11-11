@@ -36,7 +36,7 @@ cd D:/Automation/ERPgyjerp
 python -m venv .venv
 ./.venv/Scripts/python.exe -m pip install -r requirements.txt
 
-# 开发机额外装 lint / 提交守卫（CI 与纯执行环境不需要）
+# 开发/CI 额外装 lint、提交守卫（纯执行环境可以不装）
 ./.venv/Scripts/python.exe -m pip install -r requirements-dev.txt
 ./.venv/Scripts/python.exe -m pre_commit install
 
@@ -367,6 +367,68 @@ UI 层：
 node tools/allure/node_modules/allure-commandline/bin/allure open reports/allure-report/<时间戳>
 ```
 
+## 质量门禁与定时任务
+
+### 离线门禁（提交前 / CI 都跑这个）
+
+```bash
+./.venv/Scripts/python.exe tools/gate.py
+```
+
+不用浏览器、不连 ERP，20 秒内跑完五项：
+
+| 检查 | 抓什么问题 |
+| --- | --- |
+| ruff | 语法错、未定义名、未用导入、导入排序、行宽 |
+| compileall | 某个模块其实已经 import 不进去 |
+| 分层边界守卫 | 用例层直接操作 DOM、页面对象重复、单文件超 500 行 |
+| 用例注册基线 | **用例静默消失**（`cases/*/__init__.py` 漏一行 import，几十条用例就不再注册） |
+| 控制台冒烟 | 真起一次面板，打首页 / 用例清单 / 404 / favicon，确认路由与清单都通 |
+
+全绿才提交。`git commit` 时 pre-commit 还会再跑一次 ruff + 边界守卫（快的那两项）。
+
+**用例数是有意的增减时**，刷新基线并一起提交：
+
+```bash
+./.venv/Scripts/python.exe tools/gate.py --update   # 写 docs/case_counts.json
+```
+
+基线存的是 125 个编号的完整清单（不是只有总数），所以「改名」「编号写错」也会被抓到。
+
+### CI
+
+`.github/workflows/ci.yml`：push 到 `main` 或开 PR 时在 `windows-latest` 上跑
+`tools/gate.py`。**只跑离线门禁**——真正跑用例要桌面 MyTest 浏览器和真实登录态，
+CI 上不具备，硬跑出来全是「阻塞」，绿得没有意义。
+
+### 夜间接口层巡检
+
+接口层不碰浏览器，可以无人值守，但需要真实 token（由桌面浏览器换取后缓存在 `.api_token`）。
+所以它留在本机，由 Windows 任务计划程序触发：
+
+```bash
+# 手动跑一次
+tools\nightly_api.cmd
+
+# 注册成每天 02:30（约 1~3 分钟）
+schtasks /Create /SC DAILY /ST 02:30 /TN "ERP-API-Nightly" ^
+         /TR "D:\Automation\ERPgyjerp\tools\nightly_api.cmd" /F
+
+# 取消
+schtasks /Delete /TN "ERP-API-Nightly" /F
+```
+
+退出码就是「任务计划程序」里的 `Last Run Result`，日志追加到 `dashboard/.cache/nightly.log`：
+
+| 退出码 | 含义 | 怎么处理 |
+| --- | --- | --- |
+| 0 | 全通过 | — |
+| 1 | 有用例失败 | 看报告 |
+| 2 | 一条都没选中 | 注册被改坏了，跑 `tools/gate.py` |
+| 3 | 接口认证不可用（token 过期且浏览器没开） | 登录一次 ERP，手动跑一遍接口层把 token 写回 |
+
+UI 层依赖桌面浏览器，没法无人值守，**每周手动跑一次全量**即可。
+
 ## 项目结构
 
 ```
@@ -445,7 +507,10 @@ ERPgyjerp/
 ├── docs/
 │   ├── 接口契约-多单位-商品-仓库.md   # 接口清单、请求体样例、实测校验口径、覆盖情况
 │   ├── 重构规划.md             # 分层问题诊断与 P0~P3 路线图
-│   └── boundary_baseline.json  # 边界守卫的指标基线（只允许下降）
+│   ├── boundary_baseline.json  # 边界守卫的指标基线（只允许下降）
+│   └── case_counts.json        # 用例注册基线（125 个编号的完整清单，gate.py 比对）
+│
+├── .github/workflows/ci.yml    # CI：push / PR 时在 windows-latest 上跑 tools/gate.py
 │
 ├── tools/
 │   ├── probe.py                # 页面探查：dom / modal / product / depot
@@ -453,6 +518,9 @@ ERPgyjerp/
 │   ├── api_recorder_write.py   # 接口抓包（写链路）：测试前缀下跑完整 CRUD
 │   ├── api_probe_server.py     # 服务端校验行为探测：空值/缺字段/越界/重名
 │   ├── check_boundaries.py     # 分层边界守卫：用例层不碰 DOM / 页面对象不重复 / 文件不超 500 行
+│   ├── gate.py                 # 离线门禁：ruff + 编译 + 边界 + 用例注册基线 + 面板冒烟
+│   ├── nightly_api.py          # 夜间接口巡检：只跑接口层，区分「失败」与「token 过期」
+│   ├── nightly_api.cmd         # 给 Windows 任务计划程序调用的壳（ASCII-only，避免 cmd 乱码）
 │   ├── api_dump/               # 抓包产物 md + json（已 gitignore，可随时重采）
 │   └── allure/                 # 随项目安装的 allure-commandline（node_modules 不入库）
 │
