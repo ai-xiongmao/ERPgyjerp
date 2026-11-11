@@ -27,8 +27,8 @@ try:
 except Exception:  # noqa: BLE001
     pass
 
-from browser import connect  # noqa: E402
 from config import BASE_URL  # noqa: E402
+from framework.browser import connect  # noqa: E402
 
 OUT_DIR = Path(__file__).resolve().parent / "api_dump"
 

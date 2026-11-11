@@ -1,0 +1,6 @@
+{
+  "cases_page_leak": 86,
+  "page_dup_methods": 82,
+  "big_files": 7,
+  "_note": "指标只允许下降；--update 重写本文件时请说明原因"
+}

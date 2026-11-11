@@ -861,7 +861,7 @@ def main(argv=None):
                 webbrowser.open(url)
             return 0
         print(f"[错误] 端口 {PORT} 启动失败：{exc}")
-        print(f"       端口被其它程序占用，换一个：--port 8800")
+        print("       端口被其它程序占用，换一个：--port 8800")
         return 1
 
     # 先探一轮，别让页面首屏空着；用例清单也顺手预热

@@ -112,7 +112,8 @@ rec("比例非数字", "POST", "/unit/add", body={"basicUnit": PFX + "U03", "oth
 rec("比例=0", "POST", "/unit/add", body={"basicUnit": PFX + "U04", "otherUnit": "箱", "ratio": "0"})
 rec("比例四位小数", "POST", "/unit/add", body={"basicUnit": PFX + "U05", "otherUnit": "箱", "ratio": "1.2345"})
 rec("比例超大值", "POST", "/unit/add", body={"basicUnit": PFX + "U06", "otherUnit": "箱", "ratio": "99999999"})
-rec("基本单位超长20字", "POST", "/unit/add", body={"basicUnit": PFX + "U" + "超" * 18, "otherUnit": "箱", "ratio": "10"})
+rec("基本单位超长20字", "POST", "/unit/add",
+    body={"basicUnit": PFX + "U" + "超" * 18, "otherUnit": "箱", "ratio": "10"})
 rec("基本单位含emoji", "POST", "/unit/add", body={"basicUnit": PFX + "U😀", "otherUnit": "箱", "ratio": "10"})
 rec("空请求体", "POST", "/unit/add", body={})
 rec("正常新增A", "POST", "/unit/add", body={"basicUnit": PFX + "UA", "otherUnit": "箱", "ratio": "10"})

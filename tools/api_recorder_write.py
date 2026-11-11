@@ -24,7 +24,8 @@ except Exception:  # noqa: BLE001
     pass
 
 from api_recorder import Recorder, mask, summarize  # noqa: E402
-from browser import connect  # noqa: E402
+
+from framework.browser import connect  # noqa: E402
 from framework.context import Context  # noqa: E402
 from framework.data import TestData  # noqa: E402
 

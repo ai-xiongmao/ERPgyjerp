@@ -34,10 +34,11 @@ import time
 import unicodedata
 from pathlib import Path
 
-from browser import SessionExpiredError, connect
+import cases  # noqa: F401 - 导入即注册用例
 from config import BASE_URL
 from framework import registry
 from framework.allure_report import AllureWriter, generate_report, instrument
+from framework.browser import SessionExpiredError, connect
 from framework.context import Context
 from framework.data import TestData
 from framework.runner import REPORT_DIR, Runner
@@ -46,9 +47,10 @@ from pages.depot_page import DepotPage
 from pages.product_page import ProductPage
 from pages.unit_page import UnitPage
 
-import cases  # noqa: F401 - 导入即注册用例
+ROOT = Path(__file__).resolve().parent
 
-CASE_FILE = Path(__file__).resolve().parent / "管伊佳ERP-测试用例.xlsx"
+# 用例表已迁入 data/：它是 --update-xlsx 的回填目标，不属于代码树
+CASE_FILE = ROOT / "data" / "cases.xlsx"
 ALLURE_RESULTS = REPORT_DIR / "allure-results"
 ALLURE_REPORT = REPORT_DIR / "allure-report"
 

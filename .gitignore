@@ -1,9 +1,21 @@
+# ---- 环境 / 缓存 ----
 .venv/
 __pycache__/
 *.pyc
+.ruff_cache/
+.pytest_cache/
+
+# ---- 运行产物 ----
 reports/
-*.bak_*.xlsx
-tools/allure/node_modules/
-.api_token
-tools/api_dump/
 dashboard/.cache/
+tools/api_dump/
+
+# ---- 凭证 ----
+.api_token
+
+# ---- 数据：用例表入库，回填备份与 Excel 临时锁文件不入库 ----
+*.bak_*.xlsx
+data/~$*.xlsx
+
+# ---- 三方工具（按 README 安装，不入库）----
+tools/allure/node_modules/

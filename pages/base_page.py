@@ -18,9 +18,13 @@
 import re
 import time
 
-from browser import SessionExpiredError, ensure_login, expired_modal_text, session_alive
-
 from config import ACTION_DELAY_MS
+from framework.browser import (
+    SessionExpiredError,
+    ensure_login,
+    expired_modal_text,
+    session_alive,
+)
 
 MODAL = ".ant-modal:visible:not(.ant-modal-confirm)"
 CONFIRM = ".ant-modal-confirm:visible"

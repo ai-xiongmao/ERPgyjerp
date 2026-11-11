@@ -6,8 +6,8 @@
     ctx.note(...)       记录偏差、缺陷候选等观察结论（进报告，不影响通过与否）
 """
 
-from browser import SessionExpiredError
 from config import BASE_URL, UNIT_PATH
+from framework.browser import SessionExpiredError
 from framework.data import TestData
 from pages.depot_page import DepotPage
 from pages.product_page import ProductPage

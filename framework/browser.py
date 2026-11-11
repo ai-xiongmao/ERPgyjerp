@@ -6,11 +6,11 @@
 3. 找不到业务页面时明确报错，而不是悄悄新建一个空白页。
 """
 
-from contextlib import contextmanager
 import json
 import os
 import re
 import time
+from contextlib import contextmanager
 
 from playwright.sync_api import sync_playwright
 

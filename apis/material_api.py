@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import random
 import string
-import time
 
 from apis.base import ApiBase
 

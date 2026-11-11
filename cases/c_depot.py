@@ -19,10 +19,10 @@
 
 import time
 
+from config import BASE_URL
 from framework.asserts import blocked, check, check_contains, check_eq, check_in
 from framework.registry import case, manual
 from pages.base_page import spaced
-from config import BASE_URL
 
 NO_SELECT_MSG = "请选择一条记录！"
 NO_NAME_MSG = "请输入仓库名称!"
@@ -76,7 +76,7 @@ def tc_dep_001(ctx):
 def tc_dep_002(ctx):
     """地址栏直接访问 /system/depot，不应要求重新登录。"""
     page = ctx.page
-    depot = ctx.depot.open()
+    ctx.depot.open()
     check_eq((page.url or "").rstrip("/").split("?")[0],
              BASE_URL + "/system/depot", "当前地址")
     check("login" not in (page.url or "").lower(), f"被重定向到登录页：{page.url}")

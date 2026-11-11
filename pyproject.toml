@@ -1,0 +1,23 @@
+# 本项目是脚本型测试工程（直接 `python run_cases.py` 运行），不作为发行包分发，
+# 因此这里只放工具配置，依赖钉版本在 requirements.txt / requirements-dev.txt。
+# 将来若要打包分发，再补 [build-system] 与 [project] 两节即可。
+#
+# 为什么不用 `pip install -e .`：
+#   扁平布局下 editable 安装只会暴露声明过的包，tools/ 与 dashboard/（无 __init__.py）
+#   会变成不可导入，多一类「本机好使、别人不好使」的故障源；脚本直接运行时
+#   工作目录已在 sys.path 上，收益为零。
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+extend-exclude = [".venv", "tools/allure", "reports", "dashboard/.cache", "tools/api_dump"]
+
+[tool.ruff.lint]
+# 基线：语法错误、未定义名、未用变量/导入、导入排序、行宽。当前全绿。
+# 想再收紧（如 B/BLE/SIM 规则族）时一次只加一族，加完先跑一遍全量。
+select = ["E9", "E501", "F", "I"]
+
+[tool.ruff.lint.per-file-ignores]
+# 这里的导入顺序是语义不是风格：a_*（接口层实现）必须在 c_*（UI 层）之后导入，
+# 否则 @api_case 挂载时编号尚未登记，元信息口径就会漂。见 cases/__init__.py 注释。
+"cases/__init__.py" = ["I001"]

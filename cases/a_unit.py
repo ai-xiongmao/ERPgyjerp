@@ -12,7 +12,7 @@
 TC-UNIT-001~004、010、021、023、028、031、032、034、035、036、037、043。
 """
 
-from framework.asserts import CaseFailed, check, check_eq, check_in, check_ne, blocked
+from framework.asserts import CaseFailed, check, check_eq, check_in, check_ne
 from framework.registry import api_case
 
 UNIT_FIELDS = ("id", "name", "basicUnit", "otherUnit", "otherUnitTwo", "otherUnitThree",

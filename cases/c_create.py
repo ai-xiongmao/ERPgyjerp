@@ -4,9 +4,9 @@
     打开新增弹窗 → 填/漏填字段 → 点保存 → 断言 toast / 内联红字 / 是否落库
 """
 
-from framework.asserts import check, check_contains, check_eq, check_in
-from framework.registry import case
 from cases._helpers import expected_name, expected_other
+from framework.asserts import check, check_contains, check_eq
+from framework.registry import case
 
 DUP_UNIT_MSG = "抱歉，副单位不能为空！"
 NO_RATIO_MSG = "抱歉，比例不能为空！"

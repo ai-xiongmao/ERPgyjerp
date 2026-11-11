@@ -160,7 +160,6 @@ def tc_dep_017(ctx):
 
     # 先看前端用来查重的接口是否认得出重名
     _st, body = ctx.depot.check_name_exist(name, 0)
-    exists = bool((body.get("data") or {}).get("status")) if isinstance(body.get("data"), dict) else body.get("data")
     ctx.note(f"checkIsNameExist 对已存在名称返回：{body.get('data')}")
 
     code, message = _expect_rejected(ctx, {"name": name}, "同名仓库")

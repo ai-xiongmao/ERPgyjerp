@@ -22,8 +22,6 @@
 
 import time
 
-from browser import SessionExpiredError
-
 from pages.base_page import CONFIRM, POPOVER, BasePage, spaced
 
 # 表格列索引（td 从 1 开始，与表头顺序一一对应；第 1 列是勾选框）

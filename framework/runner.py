@@ -7,15 +7,14 @@
 4. 输出 Markdown 报告（Allure 由 allure_report 单独生成），可用 --update-xlsx 回填「执行结果」列。
 """
 
-import json
 import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from pathlib import Path
 
-from browser import SessionExpiredError, ensure_login
 from framework import registry
 from framework.allure_report import writer as allure_writer
 from framework.asserts import CaseBlocked, CaseFailed
+from framework.browser import SessionExpiredError, ensure_login
 
 REPORT_DIR = Path(__file__).resolve().parents[1] / "reports"
 
@@ -64,7 +63,7 @@ class Runner:
 
         func = case.func_for(self.layer)
         if func is None:
-            detail = f"该用例没有接口版实现（仅 UI）" if self.layer == "api" else "该用例没有 UI 版实现"
+            detail = "该用例没有接口版实现（仅 UI）" if self.layer == "api" else "该用例没有 UI 版实现"
             self.log(f"        跳过：{detail}")
             return Result(case.cid, case.title, case.tag, case.priority,
                           registry.NOT_COVERED, 0.0, detail)

@@ -35,7 +35,7 @@ class ApiError(AssertionError):
 
 def _token_from_browser():
     """连 MyTest 浏览器，从 localStorage 读登录 token。"""
-    from browser import connect  # 延迟导入，避免无浏览器场景下的循环依赖
+    from framework.browser import connect  # 延迟导入，避免无浏览器场景下的循环依赖
 
     with connect() as page:
         return page.evaluate(

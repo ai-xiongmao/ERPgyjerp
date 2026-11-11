@@ -2,9 +2,9 @@
 
 import math
 
+from cases._helpers import cell_blank, expected_name, expected_other
 from framework.asserts import check, check_contains, check_eq, check_in
 from framework.registry import case, manual
-from cases._helpers import cell_blank, expected_name, expected_other
 
 
 @case("TC-UNIT-004", "无数据时显示空状态", "列表展示", "中")

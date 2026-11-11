@@ -19,9 +19,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from browser import connect  # noqa: E402
 from config import BASE_URL  # noqa: E402
-
+from framework.browser import connect  # noqa: E402
 
 # ==================== dom：当前页面结构 ====================
 DOM_JS = """() => {

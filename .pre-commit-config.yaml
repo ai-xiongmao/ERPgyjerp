@@ -1,0 +1,21 @@
+# 提交前只做两件事：捞真错误 + 守住架构约定。全部本地 hook，不联网、30 秒内跑完。
+# 启用：.venv/Scripts/python.exe -m pre_commit install
+# 手动全量跑一次：.venv/Scripts/python.exe -m pre_commit run --all-files
+#
+# 风格类告警（行宽、导入排序）暂不阻断提交，放开计划写在 pyproject.toml 里。
+repos:
+  - repo: local
+    hooks:
+      - id: boundary-guard
+        name: 分层边界守卫（用例层不碰 DOM、页面对象不重复、文件不超 500 行）
+        entry: .venv/Scripts/python.exe tools/check_boundaries.py
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: ruff-critical
+        name: ruff（语法 / 未定义名 / 未用导入 / 导入排序 / 行宽）
+        entry: .venv/Scripts/python.exe -m ruff check --force-exclude
+        language: system
+        types: [python]
+        exclude: ^tools/allure/

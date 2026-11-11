@@ -14,10 +14,10 @@
 
 import time
 
+from config import BASE_URL
 from framework.asserts import blocked, check, check_contains, check_eq, check_in
 from framework.registry import case, manual
 from pages.base_page import spaced
-from config import BASE_URL
 
 NO_SELECT_MSG = "请选择一条记录！"
 NO_NAME_MSG = "请输入名称!"
@@ -65,7 +65,10 @@ def tc_mat_001(ctx):
         # 已知系统行为：SPA 菜单跳转不更新 document.title（直接开 URL 才会变）。
         # 标题正确性由 TC-MAT-002 覆盖；这里只记录偏差，不据此判红，
         # 否则用例会因系统既有行为永久失败，掩盖真正的回归。
-        ctx.note(f"偏差：菜单进入后浏览器标题未更新（{title!r}）；直接访问 /material/material 才是「商品信息 · 管伊佳ERP」")
+        ctx.note(
+            f"偏差：菜单进入后浏览器标题未更新（{title!r}）；"
+            "直接访问 /material/material 才是「商品信息 · 管伊佳ERP」"
+        )
 
     active = [t.strip() for t in page.locator(".ant-menu-item-selected").all_inner_texts()]
     check_in("商品信息", active, "左侧菜单高亮项")
@@ -75,7 +78,7 @@ def tc_mat_001(ctx):
 def tc_mat_002(ctx):
     """地址栏直接访问 /material/material，不应要求重新登录。"""
     page = ctx.page
-    product = ctx.product.open()
+    ctx.product.open()
     check_eq((page.url or "").rstrip("/").split("?")[0],
              BASE_URL + "/material/material", "当前地址")
     check("login" not in (page.url or "").lower(), f"被重定向到登录页：{page.url}")
@@ -269,7 +272,9 @@ def tc_mat_011(ctx):
         check_in(expected, inputs, f"展开后应有「{expected}」字段")
 
     # 收起
-    collapse = product.page.locator(".ant-card:has(.ant-table) a, .ant-card:has(.ant-table) button").filter(has_text="收起")
+    collapse = product.page.locator(
+        ".ant-card:has(.ant-table) a, .ant-card:has(.ant-table) button"
+    ).filter(has_text="收起")
     if collapse.count():
         collapse.first.click()
         product.pause()
@@ -776,10 +781,17 @@ def tc_mat_040(ctx):
 
     # 手动改条码
     manual_barcode = "990" + str(int(time.time()))[-6:]
-    product.modal().evaluate("""(m, val) => {
+    product.modal().evaluate(
+        """(m, val) => {
         const b = m.querySelector('[id^=barCode_]');
-        if (b) { const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set; setter.call(b, val); b.dispatchEvent(new Event('input', {bubbles:true})); }
-    }""", manual_barcode)
+        if (!b) return;
+        const setter = Object.getOwnPropertyDescriptor(
+            window.HTMLInputElement.prototype, 'value').set;
+        setter.call(b, val);
+        b.dispatchEvent(new Event('input', {bubbles:true}));
+    }""",
+        manual_barcode,
+    )
     product.save_success()
     product.wait_row(name, present=True)
 

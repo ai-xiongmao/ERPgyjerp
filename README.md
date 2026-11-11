@@ -1,6 +1,6 @@
 # ERPgyjerp — 管伊佳 ERP UI + 接口自动化
 
-把 `管伊佳ERP-测试用例.xlsx` 里的 **125 条用例**（多单位 44 条、商品信息 43 条、仓库信息 38 条）
+把 `data/cases.xlsx` 里的 **125 条用例**（多单位 44 条、商品信息 43 条、仓库信息 38 条）
 按编号落成可执行脚本，**同一套编号、两套实现**：
 
 | 层 | 实现 | 条数 | 单条耗时 | 用途 |
@@ -35,6 +35,10 @@
 cd D:/Automation/ERPgyjerp
 python -m venv .venv
 ./.venv/Scripts/python.exe -m pip install -r requirements.txt
+
+# 开发机额外装 lint / 提交守卫（CI 与纯执行环境不需要）
+./.venv/Scripts/python.exe -m pip install -r requirements-dev.txt
+./.venv/Scripts/python.exe -m pre_commit install
 
 # Allure 报告生成器（Java 版 CLI，随项目装，不污染全局）
 npm install --prefix tools/allure allure-commandline
@@ -367,17 +371,25 @@ node tools/allure/node_modules/allure-commandline/bin/allure open reports/allure
 ```
 ERPgyjerp/
 ├── run_cases.py                # 唯一执行入口：交互菜单 + run / list 子命令（--layer ui|api）
-├── config.py                   # 系统地址、CDP 端点、接口前缀、动作间隔
-├── browser.py                  # 通过 CDP 接入桌面 MyTest 浏览器 + 登录态守卫
-├── requirements.txt            # playwright / openpyxl / allure-python-commons
-├── 管伊佳ERP-测试用例.xlsx      # 用例来源，也是 --update-xlsx 的回填目标（回填前自动备份）
+├── pyproject.toml              # ruff 配置（本项目不做发行包，依赖钉在 requirements*.txt）
+├── .pre-commit-config.yaml     # 提交守卫：分层边界检查 + ruff
+├── requirements.txt            # 运行依赖：playwright / openpyxl / allure-python-commons
+├── requirements-dev.txt        # 开发依赖：ruff / pre-commit
 ├── .api_token                  # 接口层 token 缓存（已 gitignore，不要提交）
+│
+├── config/                     # 配置出口：外部一律 `from config import X`
+│   ├── __init__.py             #   门面，将来按 ERP_ENV 选环境覆盖时调用方零改动
+│   └── settings.py             #   系统地址 / CDP 端点 / 接口前缀 / 动作间隔
+│
+├── data/
+│   └── cases.xlsx              # 用例来源，也是 --update-xlsx 的回填目标（回填前自动备份）
 ├── dashboard_server.py         # 控制台后端：环境探测 / 用例清单 / 起停执行 / 日志流
 ├── dashboard/
 │   └── index.html              # 控制台单页：环境监控 + 用例选择 + 执行配置与日志
 │                               #   （.cache/ 存用例清单缓存与 server.log，已 gitignore）
 │
 ├── framework/                  # 与业务无关的执行骨架
+│   ├── browser.py              # 通过 CDP 接入桌面 MyTest 浏览器 + 登录态守卫
 │   ├── registry.py             # 用例注册表：@case 注册 UI 实现，@api_case 挂接口实现（同编号双轨）
 │   ├── asserts.py              # 断言：check / check_eq / check_contains / blocked
 │   ├── data.py                 # 测试数据工厂：运行前缀、命名、记账
@@ -409,13 +421,16 @@ ERPgyjerp/
 │   └── a_depot.py              # 接口层：仓库信息 23 条
 │
 ├── docs/
-│   └── 接口契约-多单位-商品-仓库.md   # 接口清单、请求体样例、实测校验口径、覆盖情况
+│   ├── 接口契约-多单位-商品-仓库.md   # 接口清单、请求体样例、实测校验口径、覆盖情况
+│   ├── 重构规划.md             # 分层问题诊断与 P0~P3 路线图
+│   └── boundary_baseline.json  # 边界守卫的指标基线（只允许下降）
 │
 ├── tools/
 │   ├── probe.py                # 页面探查：dom / modal / product / depot
 │   ├── api_recorder.py         # 接口抓包（只读）：加载/查询/翻页，不落库
 │   ├── api_recorder_write.py   # 接口抓包（写链路）：测试前缀下跑完整 CRUD
 │   ├── api_probe_server.py     # 服务端校验行为探测：空值/缺字段/越界/重名
+│   ├── check_boundaries.py     # 分层边界守卫：用例层不碰 DOM / 页面对象不重复 / 文件不超 500 行
 │   ├── api_dump/               # 抓包产物 md + json（已 gitignore，可随时重采）
 │   └── allure/                 # 随项目安装的 allure-commandline（node_modules 不入库）
 │
@@ -427,7 +442,7 @@ ERPgyjerp/
 
 > `framework/__init__.py`、`pages/__init__.py` 只有包说明 docstring；`apis/__init__.py` 额外导出
 > `UnitApi / MaterialApi / DepotApi` 三个类（`from apis import UnitApi` 可直接用）；
-> `--update-xlsx` 产生的备份落在同一目录，形如 `管伊佳ERP-测试用例.bak_<时间戳>.xlsx`。
+> `--update-xlsx` 产生的备份落在 `data/` 下，形如 `cases.bak_<时间戳>.xlsx`（已 gitignore）。
 
 ## 用例覆盖
 

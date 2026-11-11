@@ -2,9 +2,9 @@
 
 import re
 
+from cases._helpers import expected_name
 from framework.asserts import check, check_contains, check_eq
 from framework.registry import case, manual
-from cases._helpers import expected_name
 
 OPTION_PATTERN = re.compile(r"^.+/.+=.+$")
 
