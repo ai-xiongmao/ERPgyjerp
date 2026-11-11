@@ -56,9 +56,10 @@ Allure 需要机器上有 **Java 11+**（当前环境是 Java 21）。只跑用�
 ./.venv/Scripts/python.exe dashboard_server.py
 ```
 
-服务监听 http://127.0.0.1:8760/ ，起来后自动打开浏览器。整个控制台就两个文件：
-`dashboard_server.py` 提供接口与执行，`dashboard/index.html` 是页面。页面每次请求实时读取，
-改 HTML 不用重启服务。
+服务监听 http://127.0.0.1:8760/ ，起来后自动打开浏览器。控制台分两层：
+`dashboard_server.py` 只做「解析参数 → 起服务」（138 行），实现在 `dashboard/` 包里
+按职责分文件（探测 / 执行 / 路由 / 动作各自独立）；`dashboard/index.html` 是页面，
+每次请求实时读取，改 HTML 不用重启服务。依赖方向见 `dashboard/__init__.py`。
 
 一屏三块：
 
@@ -383,8 +384,16 @@ ERPgyjerp/
 │
 ├── data/
 │   └── cases.xlsx              # 用例来源，也是 --update-xlsx 的回填目标（回填前自动备份）
-├── dashboard_server.py         # 控制台后端：环境探测 / 用例清单 / 起停执行 / 日志流
-├── dashboard/
+├── dashboard_server.py         # 控制台入口（138 行）：解析参数 → 起服务 → 打横幅
+├── dashboard/                  # 控制台实现，依赖单向向下
+│   ├── web.py                  #   HTTP 路由 + socket 服务（唯一对外一层，Origin/路径校验在此）
+│   ├── env.py                  #   有副作用的动作：起浏览器 / 开业务页 / 打开报告
+│   ├── health.py               #   六项只读探测 + 5s 后台轮询 + 快照
+│   ├── cases_feed.py           #   用例清单：子进程导出 + 内存/磁盘双层缓存
+│   ├── runs.py                 #   任务执行：RunSession（读子进程 stdout）/ RunManager
+│   ├── paths.py                #   磁盘位置与 venv 解释器
+│   ├── runtime.py              #   端口 / 周期 / 日志上限（PORT 是可变值，须用 runtime.PORT 访问）
+│   ├── util.py                 #   异常摘要 + 探测短缓存
 │   └── index.html              # 控制台单页：环境监控 + 用例选择 + 执行配置与日志
 │                               #   （.cache/ 存用例清单缓存与 server.log，已 gitignore）
 │
