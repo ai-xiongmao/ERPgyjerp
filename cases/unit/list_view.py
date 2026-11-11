@@ -1,10 +1,13 @@
-"""列表展示：TC-UNIT-004、005、034、035、036。"""
+"""多单位 - 列表展示（TC-UNIT-* 共 4 条）。
+
+空状态、字段展示、全选与取消全选、分页器。
+"""
 
 import math
 
 from cases._helpers import cell_blank, expected_name, expected_other
 from framework.asserts import check, check_contains, check_eq, check_in
-from framework.registry import case, manual
+from framework.registry import case
 
 
 @case("TC-UNIT-004", "无数据时显示空状态", "列表展示", "中")
@@ -109,10 +112,3 @@ def tc_unit_035(ctx):
     unit.set_page_size(10)
     unit.goto_page(1)
     check_eq(unit.pagination_info()["current"], 1, "恢复后页码")
-
-
-manual(
-    "TC-UNIT-036", "页面顶部出现无关统计卡片", "异常", "中",
-    reason="说明型用例：顶部统计卡片为首页模块的设计行为（点击过即显示），"
-           "已确认不作为缺陷，无需自动断言，回归时人工目视确认不遮挡操作即可",
-)

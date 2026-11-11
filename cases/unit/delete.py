@@ -1,4 +1,7 @@
-"""删除：TC-UNIT-030 ~ 033、044。"""
+"""多单位 - 删除（TC-UNIT-030 ~ 033）。
+
+单条删除、取消删除、未勾选时点删除；另含「删除被商品引用的单位」（留人工）。
+"""
 
 from framework.asserts import check, check_contains, check_eq
 from framework.registry import case, manual

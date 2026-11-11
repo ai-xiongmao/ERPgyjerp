@@ -1,13 +1,16 @@
-"""页面入口：TC-UNIT-001 ~ 003。"""
+"""多单位 - 页面入口（TC-UNIT-001 ~ 003）。
 
+从工作台经左侧菜单进入、直接 URL 进入、页面结构与元素完整性。
+菜单进入后 title 不更新是系统既有行为，这里只记偏差，标题正确性由 URL 直达那条覆盖。
+"""
 
 from config import BASE_URL, LOGIN_PATH, UNIT_PATH
 from framework.asserts import check, check_eq, check_in
 from framework.registry import case
 
-PAGE_TITLE = "多单位 · 管伊佳ERP"
 EXPECTED_HEADERS = ["", "#", "操作", "单位名称", "基本单位", "副单位", "副单位2", "副单位3", "状态"]
 EXPECTED_TOOLBAR = ["新增", "删除", "启用", "禁用"]
+PAGE_TITLE = "多单位 · 管伊佳ERP"
 
 
 @case("TC-UNIT-001", "通过左侧菜单进入多单位页面", "页面入口", "高")

@@ -18,6 +18,9 @@ extend-exclude = [".venv", "tools/allure", "reports", "dashboard/.cache", "tools
 select = ["E9", "E501", "F", "I"]
 
 [tool.ruff.lint.per-file-ignores]
-# 这里的导入顺序是语义不是风格：a_*（接口层实现）必须在 c_*（UI 层）之后导入，
-# 否则 @api_case 挂载时编号尚未登记，元信息口径就会漂。见 cases/__init__.py 注释。
+# 这里的导入顺序是语义不是风格：api.py（接口层实现）必须在 UI 层各文件之后导入，
+# 否则 @api_case 挂载时编号尚未登记，元信息口径就会漂。见各模块 __init__.py 的注释。
 "cases/__init__.py" = ["I001"]
+"cases/unit/__init__.py" = ["I001"]
+"cases/depot/__init__.py" = ["I001"]
+"cases/material/__init__.py" = ["I001"]

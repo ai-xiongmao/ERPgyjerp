@@ -1,4 +1,7 @@
-"""商品联动：TC-UNIT-042，以及无法构造前置条件的 TC-UNIT-037 / 044。"""
+"""多单位 - 跨模块联动（TC-UNIT-* 共 3 条）。
+
+商品端「多单位」下拉与本单位数据联动；另含两条前置条件不具备、留人工执行的用例。
+"""
 
 import re
 
@@ -7,6 +10,13 @@ from framework.asserts import check, check_contains, check_eq
 from framework.registry import case, manual
 
 OPTION_PATTERN = re.compile(r"^.+/.+=.+$")
+
+
+manual(
+    "TC-UNIT-037", "试用到期后访问与操作", "权限", "低",
+    reason="前置条件为「账号试用已到期」（当前页面显示试用到期 2026-11-08），"
+           "无法在不改变账号状态的前提下构造；到期后人工执行",
+)
 
 
 @case("TC-UNIT-042", "商品端「多单位」下拉与本单位数据联动", "商品联动", "高")
@@ -35,12 +45,6 @@ def tc_unit_042(ctx):
     product.cancel()
     check(not product.modal_visible(), "取消后商品新增弹窗应关闭")
 
-
-manual(
-    "TC-UNIT-037", "试用到期后访问与操作", "权限", "低",
-    reason="前置条件为「账号试用已到期」（当前页面显示试用到期 2026-11-08），"
-           "无法在不改变账号状态的前提下构造；到期后人工执行",
-)
 
 manual(
     "TC-UNIT-044", "删除被拦截后商品数据不受影响", "删除", "中",

@@ -1,4 +1,7 @@
-"""查询：TC-UNIT-006 ~ 011。"""
+"""多单位 - 查询（TC-UNIT-006 ~ 011）。
+
+空条件查询、精确 / 模糊 / 不存在、重置、特殊字符与超长文本。
+"""
 
 from framework.asserts import check, check_contains, check_eq
 from framework.registry import case

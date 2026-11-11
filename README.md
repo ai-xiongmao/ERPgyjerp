@@ -274,7 +274,7 @@ token 打不开局面时，每条用例会在「前置：登录态检查」这�
 完整规则（含前缀兜底、回收后清账、回收前后比总数）见文末「测试数据纪律 → 接口层补充」。
 
 接口封装在 `apis/`（对标 `pages/`：`unit_api.py` / `material_api.py` / `depot_api.py`），
-用例在 `cases/a_unit.py`(28) / `a_material.py`(20) / `a_depot.py`(23)，
+用例在 `cases/unit/api.py` / `cases/material/api.py` / `cases/depot/api.py`，
 HTTP 客户端在 `framework/api_client.py`，造数与回收在 `framework/api_context.py`。
 
 接口清单、请求体样例与实测校验口径见 [`docs/接口契约-多单位-商品-仓库.md`](docs/接口契约-多单位-商品-仓库.md)，
@@ -412,14 +412,26 @@ ERPgyjerp/
 │   ├── material_api.py         # 商品：list / add / update / 批量 / 条码 / 条码明细 / 类别树 / 属性
 │   └── depot_api.py            # 仓库：list / getAllListWithStock / add / update / 状态 / 删除 / 设为默认
 │
-├── cases/                      # 用例：一个函数 = 一条用例，文件名按标签划分
-│   ├── __init__.py             # 导入即注册：新增用例文件必须在这里加一行 import
+├── cases/                      # 用例：一个函数 = 一条用例
+│   ├── __init__.py             # 按模块导入三个子包
 │   ├── _helpers.py             # 公共小工具：单位名拼接、提示文案匹配
-│   ├── c_*.py                  # UI 层实现（c_entry / c_list / c_query / c_create / c_edit /
-│   │                           #   c_status / c_delete / c_product / c_material / c_depot）
-│   ├── a_unit.py               # 接口层：多单位 28 条
-│   ├── a_material.py           # 接口层：商品信息 20 条
-│   └── a_depot.py              # 接口层：仓库信息 23 条
+│   ├── unit/                   # 多单位 TC-UNIT-*
+│   │   ├── __init__.py         # 本模块的导入清单；api 必须最后
+│   │   ├── entry.py            # 页面入口 / 结构校验
+│   │   ├── list_view.py        # 列表展示 / 全选 / 分页
+│   │   ├── query.py            # 查询 / 重置 / 高级查询
+│   │   ├── create.py           # 新增（含必填、配对、边界值）
+│   │   ├── edit.py             # 编辑
+│   │   ├── status.py           # 启用 / 禁用 / 批量
+│   │   ├── delete.py           # 删除 / 取消删除
+│   │   ├── linkage.py          # 商品端多单位下拉联动
+│   │   ├── exception.py        # 异常 / 权限
+│   │   ├── api.py              # 接口层实现（与 UI 层同编号双轨）
+│   │   └── _const.py           # 模块内共享常量
+│   ├── depot/                  # 仓库信息 TC-DEP-*（文件同上，无 linkage 之外的差异）
+│   └── material/               # 商品信息 TC-MAT-*
+│                               #   三个模块的文件名一一对应，找用例先按编号定模块、
+│                               #   再按用例表「标签」列定文件
 │
 ├── docs/
 │   ├── 接口契约-多单位-商品-仓库.md   # 接口清单、请求体样例、实测校验口径、覆盖情况

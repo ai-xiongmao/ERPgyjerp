@@ -1,17 +1,16 @@
-"""新增：TC-UNIT-012 ~ 023、038、040、041、043。
+"""多单位 - 新增（TC-UNIT-* 共 16 条）。
 
-这一组用例的共性是「弹窗里的校验与保存」，因此都围绕：
-    打开新增弹窗 → 填/漏填字段 → 点保存 → 断言 toast / 内联红字 / 是否落库
+必填与「副单位-比例」配对校验、比例边界值、连续新增、取消新增、弹窗重置。
 """
 
 from cases._helpers import expected_name, expected_other
+from cases.unit._const import NO_BASIC_MSG
 from framework.asserts import check, check_contains, check_eq
 from framework.registry import case
 
+BAD_RATIO_MSG = "抱歉，比例只能为数字，最多三位小数！"
 DUP_UNIT_MSG = "抱歉，副单位不能为空！"
 NO_RATIO_MSG = "抱歉，比例不能为空！"
-BAD_RATIO_MSG = "抱歉，比例只能为数字，最多三位小数！"
-NO_BASIC_MSG = "请输入基本单位!"
 
 
 @case("TC-UNIT-012", "仅填基本单位保存被副单位校验拦截", "新增", "高")

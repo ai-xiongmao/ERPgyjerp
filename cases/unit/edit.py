@@ -1,9 +1,11 @@
-"""编辑：TC-UNIT-024、025。"""
+"""多单位 - 编辑与复制（TC-UNIT-024 ~ 025）。
 
+修改已有单位、编辑时清空基本单位。
+"""
+
+from cases.unit._const import NO_BASIC_MSG
 from framework.asserts import check, check_eq
 from framework.registry import case
-
-NO_BASIC_MSG = "请输入基本单位!"
 
 
 @case("TC-UNIT-024", "修改已有单位信息", "编辑", "高")

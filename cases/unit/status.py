@@ -1,4 +1,7 @@
-"""状态与批量操作：TC-UNIT-026 ~ 029、039。"""
+"""多单位 - 启用 / 禁用（TC-UNIT-* 共 5 条）。
+
+单条启用 / 禁用、未勾选时的提示、批量操作。
+"""
 
 from framework.asserts import check, check_contains, check_eq
 from framework.registry import case
