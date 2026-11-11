@@ -29,12 +29,12 @@
     保存按钮注意：新增弹窗里有**两个** ant-btn-primary（「插入行」「保存（Ctrl+S）」），
         必须用 filter(has_text='保存') 定位，否则点到「插入行」不会保存。
 
-定位一律基于实测到的 id / placeholder / 可见文案；列表行匹配按「名称」列整格比较。
+通用交互在 TablePage；这里只留商品特有：高级查询、复制弹窗、多单位勾选框、三个 Tab、
+条码表格与批量编辑保存。定位一律基于实测到的 id / placeholder / 可见文案；
+列表行匹配按「名称」列整格比较。
 """
 
-import time
-
-from pages.base_page import CONFIRM, BasePage, spaced
+from pages.table_page import TablePage
 
 # 表格列索引（td 从 1 开始；第 1 列勾选框，第 2 列操作，第 3 列起业务字段）
 COL_OP = 2       # 操作（编辑/复制）
@@ -52,9 +52,6 @@ COL_SALE = 13      # 销售价
 COL_LOWEST = 14    # 最低售价
 COL_STATUS = 15    # 状态
 
-# 保存后若出现这些字样，说明接口/校验拦下了这次写入（弹窗仍会关闭，不能只看弹窗）
-SAVE_FAILURE_HINTS = ("异常", "失败", "错误", "不能为空", "已存在", "重复")
-
 ROWS_JS = """() => Array.from(document.querySelectorAll('.ant-table-tbody tr.ant-table-row'))
     .map(tr => {
         const cells = Array.from(tr.children).map(td => (td.innerText || '').trim());
@@ -66,153 +63,25 @@ ROWS_JS = """() => Array.from(document.querySelectorAll('.ant-table-tbody tr.ant
         };
     })"""
 
-PAGINATION_JS = """() => {
-    const rows = document.querySelectorAll('.ant-table-tbody tr.ant-table-row').length;
-    const pager = document.querySelector('.ant-pagination');
-    if (!pager) return {exists: false, total: rows, pageSize: null, current: 1,
-                        pages: 1, range: '', pageNumbers: []};
-    const totalText = ((pager.querySelector('.ant-pagination-total-text') || {}).innerText || '').trim();
-    const matched = totalText.match(/共\\s*(\\d+)\\s*条/);
-    const numbers = Array.from(pager.querySelectorAll('.ant-pagination-item'))
-        .map(li => parseInt(li.innerText.trim(), 10)).filter(n => !isNaN(n));
-    const active = pager.querySelector('.ant-pagination-item-active');
-    const sizeValue = pager.querySelector('.ant-select-selection-selected-value');
-    return {
-        exists: true,
-        totalText: totalText,
-        total: matched ? parseInt(matched[1], 10) : rows,
-        range: totalText,
-        pageSize: sizeValue ? parseInt(sizeValue.innerText, 10) : null,
-        current: active ? parseInt(active.innerText.trim(), 10) : 1,
-        pages: numbers.length ? Math.max.apply(null, numbers) : 1,
-        pageNumbers: numbers,
-    };
-}"""
 
-SELECTED_JS = """() => ({
-    rows: document.querySelectorAll('.ant-table-tbody .ant-checkbox-checked').length,
-    header: (() => {
-        const box = document.querySelector('.ant-table-thead .ant-checkbox');
-        if (!box) return 'none';
-        if (box.className.indexOf('ant-checkbox-checked') >= 0) return 'checked';
-        if (box.className.indexOf('ant-checkbox-indeterminate') >= 0) return 'indeterminate';
-        return 'none';
-    })(),
-})"""
-
-
-class ProductPage(BasePage):
+class ProductPage(TablePage):
     PATH = "/material/material"
     KEYWORD_INPUT = 'input[placeholder="请输入条码、名称、助记码等查询"]'
     SPEC_INPUT = 'input[placeholder="请输入规格查询"]'
-    ROWS = ".ant-table-tbody tr.ant-table-row"
-    EMPTY = ".ant-empty-description, .ant-empty"
+    ROWS_JS = ROWS_JS
+    READ_KEYS = ("ops", "barcode", "name", "spec", "model", "color", "category",
+                 "unit", "stock", "purchase", "retail", "sale", "lowest", "status")
+    NAME_KEY = "name"
+    NAME_LABEL = "名称"
 
-    def __init__(self, page):
-        super().__init__(page)
-        # 商品信息页的查询区/工具栏也在「含表格的卡片」里
-        self.BUTTON_SCOPE = ".ant-card:has(.ant-table) button"
-
-    # ================= 导航 =================
-    def open(self):
-        from config import BASE_URL
-
-        recovered = self.ensure_alive()
-        if recovered:
-            self.page.reload(wait_until="domcontentloaded")
-            self.page.wait_for_timeout(1000)
-            self.ensure_alive()
-        if not (self.page.url or "").rstrip("/").endswith(self.PATH):
-            self.goto(BASE_URL + self.PATH)
-            self.ensure_alive()
-        try:
-            self.page.locator(self.BUTTON_SCOPE).first.wait_for(timeout=15000)
-        except Exception:
-            self.ensure_alive()
-            raise
-        self._wait_table_loaded()
-        self.ensure_alive()
-        return self
-
-    def _wait_table_loaded(self, timeout=20.0):
-        deadline = time.time() + timeout
-        while time.time() < deadline:
-            spinning = self.page.locator(".ant-spin-spinning").count()
-            has_body = self.page.locator(".ant-table-tbody").count()
-            if spinning == 0 and has_body:
-                break
-            self.page.wait_for_timeout(200)
-        self.page.wait_for_timeout(400)
-
-    # ================= 列表读取 =================
-    def rows_data(self):
-        return self._safe_evaluate(ROWS_JS, default=[]) or []
-
-    def names(self):
-        return [row["name"] for row in self.rows_data()]
-
-    def row_count(self):
-        return len(self.rows_data())
-
-    def total_count(self):
-        return self.pagination_info()["total"]
-
-    def pagination_info(self):
-        return self._safe_evaluate(PAGINATION_JS, default={
-            "exists": False, "total": 0, "pageSize": None,
-            "current": 1, "pages": 1, "range": "", "pageNumbers": []})
-
-    def empty_text(self):
-        locator = self.page.locator(self.EMPTY).first
-        if not locator.count():
-            return ""
-        return (locator.inner_text() or "").strip()
-
-    def has_row(self, name):
-        return name in self.names()
-
-    def count_row(self, name):
-        return self.names().count(name)
-
-    def row_index(self, name, nth=0):
-        hits = [i for i, n in enumerate(self.names()) if n == name]
-        assert len(hits) > nth, f"表格中找不到第 {nth + 1} 条名称「{name}」，当前：{self.names()}"
-        return hits[nth]
-
-    def row_locator(self, name, nth=0):
-        return self.page.locator(self.ROWS).nth(self.row_index(name, nth))
-
-    def read_row(self, name, nth=0):
-        row = self.rows_data()[self.row_index(name, nth)]
-        return {key: row[key] for key in (
-            "ops", "barcode", "name", "spec", "model", "color", "category",
-            "unit", "stock", "purchase", "retail", "sale", "lowest", "status")}
-
-    def statuses(self):
-        return {row["name"]: row["status"] for row in self.rows_data()}
+    # 主查询框 + 重置时要一并清空的其它查询框
+    SEARCH_INPUT = KEYWORD_INPUT
+    SEARCH_EXTRA_INPUTS = (SPEC_INPUT,)
 
     # ================= 查询 =================
-    def search(self, keyword):
-        """按关键词（条码/名称/助记码）模糊查询。"""
-        self.ensure_alive()
-        self.fill(self.KEYWORD_INPUT, keyword)
-        self.click_button("查询")
-        self._wait_table_loaded()
-        return self
-
     def search_spec(self, spec):
         self.fill(self.SPEC_INPUT, spec)
         self.click_button("查询")
-        self._wait_table_loaded()
-        return self
-
-    def reset(self):
-        """清空查询条件，回到全量列表第一页。"""
-        if self.page.locator(self.KEYWORD_INPUT).count():
-            self.fill(self.KEYWORD_INPUT, "")
-        if self.page.locator(self.SPEC_INPUT).count():
-            self.fill(self.SPEC_INPUT, "")
-        self.click_button("重置")
         self._wait_table_loaded()
         return self
 
@@ -225,26 +94,8 @@ class ProductPage(BasePage):
         return self
 
     # ================= 新增 / 编辑 / 复制弹窗 =================
-    def open_create_modal(self):
-        self.ensure_alive()
-        self.close_overlays()
-        self.click_button("新增")
-        self.modal().wait_for(state="visible", timeout=10000)
-        self.pause()
-        return self
-
-    def open_edit_modal(self, name, nth=0):
-        self.ensure_alive()
-        self.close_overlays()
-        self.row_locator(name, nth).locator("a", has_text="编辑").click()
-        self.modal().wait_for(state="visible", timeout=10000)
-        self.pause()
-        return self
-
     def open_copy_modal(self, name, nth=0):
-        self.ensure_alive()
-        self.close_overlays()
-        self.row_locator(name, nth).locator("a", has_text="复制").click()
+        self.click_row_link("复制", name, nth)
         self.modal().wait_for(state="visible", timeout=10000)
         self.pause()
         return self
@@ -282,43 +133,6 @@ class ProductPage(BasePage):
             self.fill_unit(unit)
         return self
 
-    def save_button(self):
-        """保存按钮：必须用文案「保存」定位，避免误点「插入行」（同为 primary）。
-
-        文案有两种：新增/编辑弹窗是「保存（Ctrl+S）」，批量编辑弹窗是「保 存」，
-        所以用 spaced() 宽松匹配，别写死字符串。
-        """
-        return self.modal().locator("button").filter(has_text=spaced("保存")).first
-
-    def click_save(self):
-        self.save_button().click()
-        self.pause()
-        return self
-
-    def save_success(self):
-        """点保存并等弹窗关闭；接口报错时弹窗也会关，必须再查失败 toast。"""
-        modal = self.modal()
-        self.drain_toasts(timeout=3000)
-        self.click_save()
-        try:
-            modal.wait_for(state="hidden", timeout=12000)
-        except Exception as exc:  # noqa: BLE001
-            self._expired_or_raise("保存", exc)
-            hints = self.toasts() + self.inline_errors()
-            raise AssertionError(f"保存后弹窗未关闭，页面提示：{hints}") from exc
-        self._wait_table_loaded()
-        for message in self.toasts():
-            if any(hint in message for hint in SAVE_FAILURE_HINTS):
-                raise AssertionError(f"保存未成功，接口提示「{message}」")
-        return self
-
-    def save_blocked(self, expect=None):
-        """点保存但预期被校验拦截：返回 {toast, inline, matched}。"""
-        self.drain_toasts()
-        self.click_save()
-        matched = self.wait_message(expect) if expect else None
-        return {"toast": self.toasts(), "inline": self.inline_errors(), "matched": matched}
-
     def save_batch(self):
         """批量编辑保存：点「保存」会先弹「确认操作 / 是否操作选中的N条数据?」。
 
@@ -347,9 +161,6 @@ class ProductPage(BasePage):
         self.save_success()
         self.wait_row(name, present=True)
         return self
-
-    def cancel(self):
-        return self.cancel_modal()
 
     # ================= 多单位 =================
     def multi_unit_checkbox(self):
@@ -416,159 +227,3 @@ class ProductPage(BasePage):
                 .map(t => (t.innerText || '').trim()).filter(Boolean);
             return ths;
         }""")
-
-    # ================= 勾选 =================
-    def selection(self):
-        return self._safe_evaluate(SELECTED_JS, default={"rows": 0, "header": "none"})
-
-    def selected_count(self):
-        return self.selection()["rows"]
-
-    def header_state(self):
-        return self.selection()["header"]
-
-    def _wait_selected(self, expected, timeout=8.0):
-        deadline = time.time() + timeout
-        while time.time() < deadline:
-            if self.selected_count() == expected:
-                return True
-            self.page.wait_for_timeout(150)
-        return False
-
-    def select_row(self, name, nth=0):
-        before = self.selected_count()
-        self.row_locator(name, nth).locator(".ant-checkbox").click()
-        self.pause(300)
-        assert self._wait_selected(before + 1), (
-            f"勾选「{name}」失败：勾选数仍为 {self.selected_count()}")
-        return self
-
-    def select_rows(self, names):
-        for name in names:
-            self.select_row(name)
-        return self
-
-    def select_all(self, checked=True, timeout=8.0):
-        self.drain_toasts(timeout=3000)
-        expected = self.row_count() if checked else 0
-        for selector in (".ant-table-thead .ant-checkbox-input", ".ant-table-thead .ant-checkbox"):
-            locator = self.page.locator(selector)
-            if not locator.count():
-                continue
-            try:
-                locator.first.click(force=True, timeout=5000)
-            except Exception:  # noqa: BLE001
-                continue
-            self.pause(300)
-            if self._wait_selected(expected, timeout=timeout / 2):
-                return self
-        raise AssertionError(
-            f"{'全选' if checked else '取消全选'}失败：勾选数 {self.selected_count()}，期望 {expected}")
-
-    def clear_selection(self, limit=60):
-        for _ in range(limit):
-            checked = self.page.locator(".ant-table-tbody .ant-checkbox-checked")
-            if not checked.count():
-                break
-            try:
-                checked.first.click()
-            except Exception:  # noqa: BLE001
-                self.close_overlays()
-                try:
-                    checked.first.click()
-                except Exception:
-                    break
-            self.page.wait_for_timeout(120)
-        return self
-
-    # ================= 工具栏 / 批量操作 =================
-    def click_toolbar(self, action):
-        return self.click_button(action)
-
-    def batch_action(self, action, expect_confirm=True):
-        """工具栏操作（启用/禁用/删除/批量编辑等）：返回确认框 (标题, 正文)。"""
-        self.drain_toasts()
-        self.click_toolbar(action)
-        if not expect_confirm:
-            return "", ""
-        dialog = self.page.locator(CONFIRM)
-        dialog.wait_for(state="visible", timeout=8000)
-        title, content = self.confirm_texts()
-        self.click_confirm("确定")
-        self._wait_table_loaded()
-        return title, content
-
-    def set_status(self, name, status):
-        self.clear_selection()
-        self.select_row(name)
-        title, content = self.batch_action(status)
-        self.wait_status(name, status)
-        return title, content
-
-    def wait_status(self, name, status, timeout=12.0):
-        deadline = time.time() + timeout
-        last = ""
-        while time.time() < deadline:
-            last = self.statuses().get(name, "")
-            if last == status:
-                return True
-            self.page.wait_for_timeout(250)
-        raise AssertionError(f"等待「{name}」状态变为「{status}」超时，当前状态：{last!r}")
-
-    # ================= 等待 / 清理 =================
-    def wait_row(self, name, present=True, timeout=15.0):
-        deadline = time.time() + timeout
-        while time.time() < deadline:
-            if self.has_row(name) == present:
-                return True
-            self.page.wait_for_timeout(250)
-        state = "出现" if present else "消失"
-        raise AssertionError(f"等待「{name}」{state}超时（{timeout}s）")
-
-    def cleanup_contains(self, token, limit=60):
-        """按运行前缀回收测试商品：只删「名称含 token」的行。"""
-        if not token:
-            return 0
-        removed = 0
-        self.close_overlays()
-        self.clear_selection()
-        self.search(token)
-        try:
-            while removed < limit:
-                rows = self.rows_data()
-                target = None
-                for index, row in enumerate(rows):
-                    if token in (row["name"] or ""):
-                        target = (row["name"], index)
-                        break
-                if target is None:
-                    break
-                nth = sum(1 for r in rows[:target[1]] if r["name"] == target[0])
-                self.delete(target[0], nth=nth)
-                removed += 1
-        finally:
-            self.reset()
-        return removed
-
-    def delete(self, name, nth=0):
-        """删除一条商品：勾选 + 工具栏「删除」→ 确认框确定。"""
-        self.ensure_alive()
-        before = self.count_row(name)
-        self.clear_selection()
-        self.select_row(name, nth)
-        title, content = self.batch_action("删除")
-        try:
-            self.wait_row_count(name, before - 1)
-        except AssertionError:
-            self._raise_if_session_dead()
-            raise
-        return self
-
-    def wait_row_count(self, name, expected, timeout=15.0):
-        deadline = time.time() + timeout
-        while time.time() < deadline:
-            if self.count_row(name) == expected:
-                return True
-            self.page.wait_for_timeout(250)
-        raise AssertionError(
-            f"等待「{name}」行数为 {expected} 超时，当前 {self.count_row(name)}")

@@ -401,9 +401,10 @@ ERPgyjerp/
 │
 ├── pages/                      # 页面对象：只放选择器与页面交互，不含断言
 │   ├── base_page.py            # AntD 通用：按钮 / toast / 确认框 / Popover / 浮层清理
-│   ├── unit_page.py            # 多单位：增删改查 + 勾选 + 批量 + 分页 + 状态
-│   ├── product_page.py         # 商品信息：列表/查询/新增/编辑/复制/批量/多单位/列设置
-│   └── depot_page.py           # 仓库信息：增删改查 + 设为默认 + 启用禁用 + 负责人下拉
+│   ├── table_page.py           # 列表页公共层：查询 / 勾选 / 工具栏 / 分页 / 等待 / 数据回收
+│   ├── unit_page.py            # 多单位：四个单位字段 + 行内删除（Popconfirm）
+│   ├── product_page.py         # 商品信息：高级查询 / 复制 / 多单位勾选 / 三个 Tab / 批量编辑
+│   └── depot_page.py           # 仓库信息：双查询框 + 负责人下拉 + 设为默认
 │
 ├── apis/                       # 接口封装（对标 pages/）：只组装请求与解析响应，不含断言
 │   ├── base.py                 # 公共基类：list / all / count、ids 形态、code_msg 错误码

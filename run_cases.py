@@ -45,6 +45,7 @@ from framework.runner import REPORT_DIR, Runner
 from pages.base_page import BasePage
 from pages.depot_page import DepotPage
 from pages.product_page import ProductPage
+from pages.table_page import TablePage
 from pages.unit_page import UnitPage
 
 ROOT = Path(__file__).resolve().parent
@@ -512,8 +513,10 @@ def cmd_run(args):
     allure = None
     if args.allure != "off":
         if layer == "ui":
-            # 给页面对象的动作方法套上「记步骤」，报告里才能看到点了什么、填了什么
-            instrument(BasePage, UnitPage, ProductPage, DepotPage)
+            # 给页面对象的动作方法套上「记步骤」，报告里才能看到点了什么、填了什么。
+            # TablePage 必须列进来：公共交互（查询/勾选/工具栏/分页/回收）都在它上面，
+            # 只 instrument 子类的话这些动作会从报告里消失。
+            instrument(BasePage, TablePage, UnitPage, ProductPage, DepotPage)
         allure = AllureWriter(
             ALLURE_RESULTS,
             run_meta={
