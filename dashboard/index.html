@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>管伊佳ERP 自动化控制台</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232f62f0'/%3E%3Cpath d='M20 22h24M20 32h18M20 42h24' stroke='white' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg:#f3f5f9;
+    --panel:#ffffff;
+    --line:#e5e8ef;
+    --line-soft:#eef1f6;
+    --ink:#151a22;
+    --ink-2:#5a6474;
+    --ink-3:#8b94a5;
+    --brand:#2f62f0;
+    --brand-soft:#eef3ff;
+    --ok:#0f9d58;
+    --ok-soft:#e8f7ef;
+    --warn:#d98600;
+    --warn-soft:#fdf3e2;
+    --bad:#dc2f3c;
+    --bad-soft:#fdecee;
+    --term:#0f141c;
+    --term-ink:#c8d4e4;
+    --radius:14px;
+    --shadow:0 1px 2px rgba(16,24,40,.05), 0 10px 28px -18px rgba(16,24,40,.35);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei","PingFang SC",sans-serif;
+    -webkit-font-smoothing:antialiased;
+    padding:20px 24px 26px;
+  }
+  .wrap{max-width:1480px;margin:0 auto;}
+
+  /* ---------- 顶栏 ---------- */
+  .topbar{display:flex;align-items:center;gap:14px;margin-bottom:18px;flex-wrap:wrap;}
+  .logo{
+    width:42px;height:42px;border-radius:12px;flex:none;
+    background:linear-gradient(145deg,#3d74ff,#1f4fd8);
+    color:#fff;display:grid;place-items:center;font-size:19px;font-weight:700;
+    box-shadow:0 6px 16px -6px rgba(47,98,240,.75);
+  }
+  .brand h1{font-size:19px;margin:0;letter-spacing:.2px;font-weight:650;}
+  .brand p{margin:1px 0 0;font-size:12.5px;color:var(--ink-3);}
+  .top-right{margin-left:auto;display:flex;align-items:center;gap:10px;}
+  .pill{
+    display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 13px;
+    border-radius:999px;background:#fff;border:1px solid var(--line);
+    font-size:12.5px;color:var(--ink-2);white-space:nowrap;
+  }
+  .pill b{font-weight:600;color:var(--ink);}
+  .dot{width:7px;height:7px;border-radius:50%;background:#b8c0cd;flex:none;}
+  .dot.ok{background:var(--ok);box-shadow:0 0 0 3px rgba(15,157,88,.14);}
+  .dot.warn{background:var(--warn);box-shadow:0 0 0 3px rgba(217,134,0,.15);}
+  .dot.fail{background:var(--bad);box-shadow:0 0 0 3px rgba(220,47,60,.14);}
+  .dot.live{background:var(--brand);animation:pulse 1.5s infinite;}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(47,98,240,.45);}70%{box-shadow:0 0 0 7px rgba(47,98,240,0);}100%{box-shadow:0 0 0 0 rgba(47,98,240,0);}}
+  button{font-family:inherit;font-size:13px;cursor:pointer;border-radius:9px;transition:.15s;}
+  .btn{
+    height:32px;padding:0 13px;border:1px solid var(--line);background:#fff;color:var(--ink-2);
+  }
+  .btn:hover{border-color:#cfd6e4;color:var(--ink);background:#fafbfd;}
+  .btn:disabled{opacity:.5;cursor:not-allowed;}
+  .btn.sm{height:27px;padding:0 10px;font-size:12px;border-radius:7px;}
+  /* 「一键准备环境」：需要动作时用品牌色提示，就绪后自动变回普通按钮 */
+  .btn.accent{border-color:#bcd0ff;background:var(--brand-soft);color:#1f47c4;font-weight:600;}
+  .btn.accent:hover{border-color:#9dbaff;background:#e4ecff;color:#1a3ba8;}
+  .btn.accent:disabled{background:#f4f6fb;border-color:var(--line);color:var(--ink-3);font-weight:400;}
+
+  /* ---------- 环境监控 ---------- */
+  .section-head{display:flex;align-items:baseline;gap:10px;margin:0 0 10px;}
+  .section-head h2{font-size:13px;margin:0;font-weight:650;letter-spacing:.4px;color:var(--ink-2);text-transform:uppercase;}
+  .section-head .meta{font-size:12px;color:var(--ink-3);margin-left:auto;}
+  .health{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:18px;}
+  .hcard{
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:12px 13px 11px;box-shadow:var(--shadow);position:relative;overflow:hidden;
+  }
+  .hcard::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:#dfe4ec;}
+  .hcard.ok::before{background:var(--ok);}
+  .hcard.warn::before{background:var(--warn);}
+  .hcard.fail::before{background:var(--bad);}
+  .hcard .hname{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ink-3);margin-bottom:6px;}
+  .hcard .hval{font-size:16.5px;font-weight:650;letter-spacing:.2px;line-height:1.25;}
+  .hcard.ok .hval{color:#0b7a45;}
+  .hcard.warn .hval{color:#b06e00;}
+  .hcard.fail .hval{color:var(--bad);}
+  .hcard .hdetail{font-size:11.5px;color:var(--ink-3);margin-top:4px;line-height:1.45;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .hcard .haction{
+    margin-top:9px;height:26px;padding:0 10px;font-size:12px;border-radius:7px;
+    border:1px solid #f1d9b4;background:var(--warn-soft);color:#9c6200;
+  }
+  .hcard .haction:hover{background:#fbeacd;}
+
+  /* ---------- 主布局 ---------- */
+  .layout{display:grid;grid-template-columns:minmax(0,1fr) 408px;gap:16px;align-items:start;}
+  @media(max-width:1180px){.layout{grid-template-columns:minmax(0,1fr);}}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);}
+  .panel-head{display:flex;align-items:center;gap:10px;padding:14px 16px 12px;border-bottom:1px solid var(--line-soft);}
+  .panel-head h2{font-size:14.5px;margin:0;font-weight:650;}
+  .panel-head .right{margin-left:auto;display:flex;align-items:center;gap:8px;}
+
+  /* 层级切换 */
+  .seg{display:inline-flex;background:#eef1f7;border-radius:9px;padding:3px;gap:2px;}
+  .seg button{
+    border:0;background:transparent;height:26px;padding:0 12px;border-radius:7px;
+    font-size:12.5px;color:var(--ink-2);font-weight:500;
+  }
+  .seg button.active{background:#fff;color:var(--brand);font-weight:600;box-shadow:0 1px 3px rgba(16,24,40,.12);}
+  .seg button .n{font-size:11px;color:var(--ink-3);margin-left:4px;font-variant-numeric:tabular-nums;}
+  .seg button.active .n{color:var(--brand);}
+
+  /* 筛选 */
+  .filters{padding:12px 16px 4px;display:flex;flex-direction:column;gap:8px;}
+  .frow{display:flex;align-items:flex-start;gap:10px;}
+  .flabel{font-size:12px;color:var(--ink-3);width:34px;flex:none;line-height:24px;}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;flex:1;min-width:0;}
+  .chip{
+    height:24px;padding:0 10px;border-radius:7px;border:1px solid var(--line);
+    background:#fff;font-size:12px;color:var(--ink-2);display:inline-flex;align-items:center;gap:5px;
+  }
+  .chip .n{font-size:11px;color:var(--ink-3);font-variant-numeric:tabular-nums;}
+  .chip:hover{border-color:#c9d2e2;background:#fafbfd;}
+  .chip.on{background:var(--brand-soft);border-color:#c3d3ff;color:var(--brand);font-weight:600;}
+  .chip.on .n{color:var(--brand);opacity:.75;}
+  .search{
+    flex:1;height:28px;border:1px solid var(--line);border-radius:8px;padding:0 10px 0 30px;
+    font-family:inherit;font-size:12.5px;color:var(--ink);background:#fff url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238b94a5' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-4-4'/%3E%3C/svg%3E") no-repeat 9px center;
+    outline:none;transition:.15s;
+  }
+  .search:focus{border-color:#b9caf8;box-shadow:0 0 0 3px rgba(47,98,240,.1);}
+
+  /* 工具栏 */
+  .tools{display:flex;align-items:center;gap:7px;padding:10px 16px;border-bottom:1px solid var(--line-soft);}
+  .tools .sel{margin-left:auto;font-size:12.5px;color:var(--ink-3);}
+  .tools .sel b{color:var(--brand);font-weight:650;font-variant-numeric:tabular-nums;}
+
+  /* 用例表 */
+  .table-wrap{max-height:466px;overflow:auto;border-radius:0 0 var(--radius) var(--radius);}
+  table{width:100%;border-collapse:separate;border-spacing:0;font-size:12.8px;}
+  thead th{
+    position:sticky;top:0;z-index:2;background:#fafbfd;text-align:left;
+    font-size:11.5px;font-weight:600;color:var(--ink-3);letter-spacing:.3px;
+    padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap;
+  }
+  thead th:first-child{padding-left:16px;}
+  tbody td{padding:8px 10px;border-bottom:1px solid var(--line-soft);vertical-align:middle;}
+  tbody td:first-child{padding-left:16px;}
+  tbody tr{cursor:pointer;}
+  tbody tr:hover{background:#fafbfe;}
+  tbody tr.sel{background:#f4f7ff;}
+  tbody tr.sel:hover{background:#eff4ff;}
+  tbody tr.disabled{cursor:not-allowed;color:var(--ink-3);}
+  tbody tr.disabled .ctitle{color:var(--ink-3);}
+  .cid{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:11.8px;color:var(--ink-2);white-space:nowrap;}
+  .ctitle{color:var(--ink);}
+  .ctag{color:var(--ink-3);white-space:nowrap;font-size:12px;}
+  .cmod{color:var(--ink-3);white-space:nowrap;font-size:12px;}
+  .st{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;white-space:nowrap;padding:1px 7px;border-radius:6px;}
+  .st.ready{color:#0b7a45;background:var(--ok-soft);}
+  .st.blocked{color:#9c6200;background:var(--warn-soft);}
+  .st.none{color:var(--ink-3);background:#f1f3f7;}
+  input[type=checkbox]{accent-color:var(--brand);width:14px;height:14px;cursor:pointer;margin:0;vertical-align:-2px;}
+  input[type=checkbox]:disabled{cursor:not-allowed;}
+  .empty{padding:36px 16px;text-align:center;color:var(--ink-3);font-size:13px;}
+
+  /* 右侧配置 */
+  .side{padding-bottom:14px;}
+  .opts{padding:10px 16px 4px;display:flex;flex-direction:column;gap:9px;}
+  .opt{display:flex;align-items:flex-start;gap:8px;font-size:12.8px;color:var(--ink-2);cursor:pointer;line-height:1.5;}
+  .opt input{margin-top:2px;}
+  .opt .tip{display:block;font-size:11.5px;color:var(--ink-3);margin-top:1px;}
+  .plan{
+    margin:12px 16px 0;padding:10px 12px;border-radius:10px;background:#f7f9fc;
+    border:1px solid var(--line-soft);font-size:12.5px;color:var(--ink-2);line-height:1.7;
+  }
+  .plan b{color:var(--ink);font-variant-numeric:tabular-nums;}
+  .plan .warnline{color:#9c6200;}
+  .actions{padding:12px 16px 0;display:flex;gap:8px;}
+  .primary{
+    flex:1;height:40px;border:0;border-radius:10px;font-size:14px;font-weight:600;color:#fff;
+    background:linear-gradient(145deg,#3d74ff,#2450d8);
+    box-shadow:0 8px 18px -10px rgba(47,98,240,.9);
+  }
+  .primary:hover{filter:brightness(1.05);}
+  .primary:disabled{background:#c6cddb;box-shadow:none;cursor:not-allowed;filter:none;}
+  .danger{
+    flex:1;height:40px;border-radius:10px;border:1px solid #f3c6ca;
+    background:var(--bad-soft);color:var(--bad);font-weight:600;
+  }
+  .danger:hover{background:#fbe0e3;}
+  /* 执行中收起配置项与计划，把高度留给日志 */
+  .side.running .opts,.side.running .plan{display:none;}
+
+  /* 进度 */
+  .progress{margin:14px 16px 0;border-top:1px solid var(--line-soft);padding-top:13px;display:none;}
+  .progress.show{display:block;}
+  .pbar{height:6px;border-radius:999px;background:#eef1f7;overflow:hidden;}
+  .pbar i{display:block;height:100%;width:0;border-radius:999px;background:linear-gradient(90deg,#4a7cff,#2f62f0);transition:width .4s ease;}
+  .pmeta{display:flex;align-items:center;gap:8px;margin-top:7px;font-size:12px;color:var(--ink-3);}
+  .pmeta .cur{color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .pmeta .pct{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--ink-2);font-weight:600;}
+  .counts{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:11px;}
+  .cnt{background:#f8fafc;border:1px solid var(--line-soft);border-radius:9px;padding:7px 8px;text-align:center;}
+  .cnt .k{font-size:11px;color:var(--ink-3);}
+  .cnt .v{font-size:16px;font-weight:650;font-variant-numeric:tabular-nums;line-height:1.3;}
+  .cnt.p .v{color:var(--ok);}
+  .cnt.f .v{color:var(--bad);}
+  .cnt.b .v{color:var(--warn);}
+  .cnt.e .v{color:#7c4dff;}
+  .report{margin-top:10px;font-size:12px;display:none;flex-wrap:wrap;gap:6px;align-items:center;}
+  .report.show{display:flex;}
+  .report .path{flex:1;min-width:0;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font-family:ui-monospace,Consolas,monospace;font-size:11.5px;}
+
+  /* 日志 */
+  .logbox{margin:14px 16px 0;}
+  .logbox .lhead{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+  .logbox .lhead span{font-size:12px;color:var(--ink-3);}
+  .logbox .lhead .live{margin-left:auto;font-size:11px;color:var(--brand);display:none;}
+  .log{
+    margin:0;height:250px;overflow:auto;background:var(--term);border-radius:10px;
+    padding:10px 12px;font-family:ui-monospace,SFMono-Regular,Consolas,"Courier New",monospace;
+    font-size:11.6px;line-height:1.62;color:var(--term-ink);white-space:pre-wrap;word-break:break-word;
+  }
+  .log .ln{min-height:1.6em;}
+  .log .ln.ok{color:#5fd39a;}
+  .log .ln.fail{color:#ff8a92;}
+  .log .ln.err{color:#ffbe5c;}
+  .log .ln.skip{color:#8e9bb0;}
+  .log .ln.hl{color:#8fb8ff;}
+  .log .placeholder{color:#8a97ad;}
+
+  /* toast */
+  #toast{
+    position:fixed;left:50%;bottom:26px;transform:translate(-50%,14px);
+    background:#1a2230;color:#fff;font-size:13px;padding:9px 16px;border-radius:10px;
+    box-shadow:0 12px 30px -12px rgba(0,0,0,.6);opacity:0;pointer-events:none;transition:.22s;z-index:99;
+    max-width:70vw;
+  }
+  #toast.show{opacity:1;transform:translate(-50%,0);}
+  #toast.bad{background:#a02733;}
+
+  ::-webkit-scrollbar{width:9px;height:9px;}
+  ::-webkit-scrollbar-thumb{background:#d3d9e4;border-radius:9px;border:2px solid transparent;background-clip:content-box;}
+  ::-webkit-scrollbar-thumb:hover{background:#bcc5d4;background-clip:content-box;}
+  .log::-webkit-scrollbar-thumb{background:#2b3444;background-clip:content-box;}
+
+  /* 大屏：一屏内布局，表格与日志各自滚动，执行时日志不会被挤出视口。
+     放在样式表末尾——同权重规则按书写顺序覆盖，放前面会被 .table-wrap 的 max-height 顶掉 */
+  @media (min-width:1181px) and (min-height:720px){
+    body{height:100vh;overflow:hidden;display:flex;}
+    .wrap{display:flex;flex-direction:column;flex:1;min-height:0;width:100%;}
+    .topbar,.section-head,.health{flex:none;}
+    .layout{flex:1;min-height:0;align-items:stretch;grid-template-rows:minmax(0,1fr);}
+    .layout > .panel, .layout > .side{display:flex;flex-direction:column;min-height:0;}
+    .table-wrap{flex:1;min-height:150px;max-height:none;}
+    .side .logbox{flex:1;min-height:118px;display:flex;flex-direction:column;margin-bottom:0;}
+    .side .log{flex:1;height:auto;min-height:120px;}
+  }
+
+  /* 笔记本矮屏（720~880 高）：藏掉配置项说明，把高度让给日志 */
+  @media (min-height:720px) and (max-height:880px){
+    .opt .tip{display:none;}
+    .opt{font-size:12.5px;line-height:1.4;}
+    .opts{gap:7px;padding:9px 16px 2px;}
+    .plan{margin-top:9px;padding:9px 11px;font-size:12px;line-height:1.65;}
+    .side .log{min-height:150px;}
+  }
+
+  /* ---------- 连接状态条：后端不可达时常驻顶部 ---------- */
+  .connbar{
+    display:none;align-items:center;gap:10px;flex:none;
+    background:var(--bad-soft);border:1px solid #f3c6ca;color:#9c1c26;
+    border-radius:10px;padding:9px 13px;margin-bottom:14px;font-size:13px;line-height:1.5;
+  }
+  .connbar.show{display:flex;}
+  .connbar b{font-weight:650;}
+  .connbar .cb-sp{flex:1;}
+  .connbar code{
+    background:#fff;border:1px solid #f3c6ca;border-radius:5px;
+    padding:1px 6px;font-size:12px;font-family:ui-monospace,Menlo,Consolas,monospace;
+  }
+  .hintcard{
+    grid-column:1 / -1;background:var(--panel);border:1px dashed var(--line);
+    border-radius:var(--radius);padding:26px;text-align:center;
+    color:var(--ink-3);font-size:13px;
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <div class="connbar" id="connBar">
+    <b id="connTitle">控制台服务未连接</b>
+    <span id="connMsg"></span>
+    <span class="cb-sp"></span>
+    <button class="btn sm" id="connRetry">重试</button>
+  </div>
+
+  <div class="topbar">
+    <div class="logo">管</div>
+    <div class="brand">
+      <h1>管伊佳ERP 自动化控制台</h1>
+      <p>UI / 接口双轨执行 · 勾选即跑 · 实时日志</p>
+    </div>
+    <div class="top-right">
+      <div class="pill" id="runPill"><span class="dot" id="runDot"></span><b>空闲</b></div>
+      <button class="btn accent" id="btnPrepare" title="按检查结果补齐环境">一键准备环境</button>
+      <button class="btn" id="btnRefresh">刷新环境</button>
+    </div>
+  </div>
+
+  <div class="section-head">
+    <h2>环境监控</h2>
+    <span class="meta" id="healthMeta">探测中…</span>
+  </div>
+  <div class="health" id="healthGrid"></div>
+
+  <div class="layout">
+    <!-- 左：用例选择 -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>用例选择</h2>
+        <div class="right">
+          <div class="seg" id="layerSwitch">
+            <button data-layer="ui" class="active">UI 层<span class="n" id="nUi"></span></button>
+            <button data-layer="api">接口层<span class="n" id="nApi"></span></button>
+          </div>
+        </div>
+      </div>
+
+      <div class="filters">
+        <div class="frow"><span class="flabel">模块</span><div class="chips" id="moduleChips"></div></div>
+        <div class="frow"><span class="flabel">标签</span><div class="chips" id="tagChips"></div></div>
+        <div class="frow"><span class="flabel">搜索</span><input class="search" id="search" placeholder="按编号或标题筛选，如 TC-UNIT-013 / 编辑"></div>
+      </div>
+
+      <div class="tools">
+        <button class="btn sm" data-bulk="all">全选可执行</button>
+        <button class="btn sm" data-bulk="invert">反选</button>
+        <button class="btn sm" data-bulk="clear">清空</button>
+        <span class="sel">已选 <b id="selCount">0</b> / <span id="visCount">0</span> 条</span>
+      </div>
+
+      <div class="table-wrap" id="tableWrap">
+        <table>
+          <colgroup>
+            <col style="width:38px"><col style="width:104px"><col><col style="width:82px"><col style="width:74px"><col style="width:88px">
+          </colgroup>
+          <thead>
+            <tr>
+              <th><input type="checkbox" id="checkAll" title="选中当前筛选下所有可执行用例"></th>
+              <th>编号</th><th>用例标题</th><th>标签</th><th>模块</th><th>状态</th>
+            </tr>
+          </thead>
+          <tbody id="caseBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 右：执行 -->
+    <aside class="panel side">
+      <div class="panel-head">
+        <h2>执行配置</h2>
+        <div class="right"><span class="pill" style="height:24px;font-size:11.5px;padding:0 9px" id="layerPill">UI 层</span></div>
+      </div>
+
+      <div class="opts">
+        <label class="opt"><input type="checkbox" id="optUpdate">
+          <span>执行后回填用例表「执行结果」<span class="tip">会先备份原表，只改这一列</span></span></label>
+        <label class="opt"><input type="checkbox" id="optKeep">
+          <span>保留测试数据<span class="tip">默认跑完按前缀回收</span></span></label>
+        <label class="opt"><input type="checkbox" id="optAllure" checked>
+          <span>生成 Allure 报告<span class="tip">单文件 HTML，双击可看</span></span></label>
+      </div>
+
+      <div class="plan" id="plan">
+        未选择用例，先在左侧勾选要执行的内容。
+      </div>
+
+      <div class="actions">
+        <button class="primary" id="btnRun" disabled>开始执行</button>
+        <button class="danger" id="btnStop" style="display:none">停止</button>
+      </div>
+
+      <div class="progress" id="progress">
+        <div class="pbar"><i id="pbarFill"></i></div>
+        <div class="pmeta">
+          <span class="cur" id="pCur">等待启动…</span>
+          <span class="pct" id="pPct">0%</span>
+        </div>
+        <div class="counts">
+          <div class="cnt p"><div class="k">通过</div><div class="v" id="cPass">0</div></div>
+          <div class="cnt f"><div class="k">失败</div><div class="v" id="cFail">0</div></div>
+          <div class="cnt b"><div class="k">阻塞</div><div class="v" id="cBlock">0</div></div>
+          <div class="cnt e"><div class="k">异常</div><div class="v" id="cErr">0</div></div>
+        </div>
+        <div class="report" id="reportRow">
+          <span class="path" id="reportPath"></span>
+          <button class="btn sm" id="btnReport">打开报告</button>
+        </div>
+      </div>
+
+      <div class="logbox">
+        <div class="lhead">
+          <span>实时日志</span>
+          <span id="logMeta"></span>
+          <span class="live" id="logLive">● 输出中</span>
+        </div>
+        <pre class="log" id="log"><span class="placeholder">暂无输出。勾选用例后点「开始执行」，日志会实时出现在这里。</span></pre>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+"use strict";
+
+/* file:// 打开时无法访问本地服务，先把这个事实说清楚，再尝试自动跳转 */
+const FILE_MODE = location.protocol === "file:";
+const DEFAULT_PORT = (new URLSearchParams(location.search).get("port") || "8760").replace(/\D/g, "") || "8760";
+const SERVICE_URL = `http://127.0.0.1:${DEFAULT_PORT}/`;
+
+const S = {
+  layer: "ui",
+  cases: [],
+  modules: [],
+  selected: new Set(),
+  filter: { modules: new Set(), tags: new Set(), q: "" },
+  run: null,          // 当前任务快照
+  runId: null,
+  logOffset: 0,
+  logFollow: true,
+  polling: false,
+  healthTs: 0,
+  checks: [],
+};
+
+const $ = (id) => document.getElementById(id);
+const el = {
+  healthGrid: $("healthGrid"), healthMeta: $("healthMeta"),
+  moduleChips: $("moduleChips"), tagChips: $("tagChips"), search: $("search"),
+  caseBody: $("caseBody"), tableWrap: $("tableWrap"), checkAll: $("checkAll"),
+  selCount: $("selCount"), visCount: $("visCount"),
+  nUi: $("nUi"), nApi: $("nApi"), layerPill: $("layerPill"),
+  plan: $("plan"), btnRun: $("btnRun"), btnStop: $("btnStop"),
+  progress: $("progress"), pbarFill: $("pbarFill"), pCur: $("pCur"), pPct: $("pPct"),
+  cPass: $("cPass"), cFail: $("cFail"), cBlock: $("cBlock"), cErr: $("cErr"),
+  reportRow: $("reportRow"), reportPath: $("reportPath"), btnReport: $("btnReport"),
+  log: $("log"), logMeta: $("logMeta"), logLive: $("logLive"),
+  runDot: $("runDot"), runPillText: null,
+  toast: $("toast"),
+  connBar: $("connBar"), connMsg: $("connMsg"), connRetry: $("connRetry"),
+  connTitle: $("connTitle"),
+  btnPrepare: $("btnPrepare"),
+};
+
+/* ---------------- 工具 ---------------- */
+function toast(msg, bad) {
+  el.toast.textContent = msg;
+  el.toast.className = "show" + (bad ? " bad" : "");
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => { el.toast.className = ""; }, 2600);
+}
+async function api(path, options) {
+  if (FILE_MODE) {
+    // 不发起注定失败的请求，直接给出能看懂的原因
+    throw new Error("页面以 file:// 打开，访问不到控制台服务");
+  }
+  const opts = Object.assign({ headers: { "Content-Type": "application/json" } }, options);
+  // 后端卡死时不要让界面一直转圈；用例清单首次要起子进程导出，给足时间
+  if (!opts.signal && typeof AbortController === "function") {
+    const ctrl = new AbortController();
+    opts.signal = ctrl.signal;
+    const limit = path.indexOf("/api/cases") === 0 ? 120000 : opts.method === "POST" ? 30000 : 15000;
+    setTimeout(() => ctrl.abort(), limit);
+  }
+  let res;
+  try {
+    res = await fetch(path, opts);
+  } catch (e) {
+    throw new Error(e.name === "AbortError" ? "请求超时，控制台服务可能已卡住" : "连不上控制台服务");
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
+  return data;
+}
+function fmtDur(sec) {
+  sec = Math.max(0, Math.round(sec || 0));
+  if (sec < 60) return sec + "s";
+  return Math.floor(sec / 60) + "m" + String(sec % 60).padStart(2, "0") + "s";
+}
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+function layerState(c) {
+  const has = S.layer === "api" ? c.api : c.ui;
+  const blocked = S.layer === "api" ? c.apiBlocked : c.uiBlocked;
+  if (!has) return { cls: "none", text: "该层无实现", ok: false };
+  if (blocked) return { cls: "blocked", text: "阻塞", ok: true, tip: blocked };
+  return { cls: "ready", text: "可执行", ok: true };
+}
+
+/* ---------------- 环境监控 ---------------- */
+function renderHealth(data) {
+  const checks = data.checks || [];
+  S.checks = checks;
+  el.healthGrid.innerHTML = checks.map((c) => {
+    const status = c.status || "unknown";
+    const action = c.action === "open-browser"
+      ? `<button class="haction" data-action="open-browser">${esc(c.actionText || "启动")}</button>` : "";
+    const hint = c.hint ? `<div class="hdetail" style="color:#9c6200" title="${esc(c.hint)}">↳ ${esc(c.hint)}</div>` : "";
+    return `<div class="hcard ${status}">
+      <div class="hname"><span class="dot ${status === "ok" ? "ok" : status === "fail" ? "fail" : "warn"}"></span>${esc(c.name)}</div>
+      <div class="hval">${esc(c.value)}</div>
+      <div class="hdetail" title="${esc(c.detail)}">${esc(c.detail)}</div>
+      ${hint}${action}
+    </div>`;
+  }).join("");
+  el.healthMeta.textContent = data.ts ? "上次探测 " + new Date(data.ts * 1000).toLocaleTimeString("zh-CN", { hour12: false }) + " · 每 5s 自动探测" : "";
+  syncPrepareBtn();
+}
+// 顶部按钮跟着检查结果走：缺什么就显示能补什么
+function syncPrepareBtn() {
+  const checks = S.checks || [];
+  const by = (k) => checks.find((c) => c.key === k) || null;
+  const btn = el.btnPrepare;
+  if (!checks.length) { btn.textContent = "一键准备环境"; btn.disabled = false; return; }
+  const browser = by("browser"), page = by("page"), site = by("site");
+
+  if (!browser || browser.status !== "ok") {
+    btn.textContent = "启动 MyTest";
+    btn.title = "MyTest 浏览器没启动，点击拉起桌面快捷方式";
+    btn.disabled = false;
+  } else if (!page || page.status !== "ok") {
+    btn.textContent = "打开业务页";
+    btn.title = "浏览器已开，但没有管伊佳的标签页，点击新建一个";
+    btn.disabled = false;
+  } else if (site && site.status === "fail") {
+    btn.textContent = "目标系统不可达";
+    btn.title = "目标站点探测失败，先确认网络或站点是否正常";
+    btn.disabled = true;
+  } else {
+    btn.textContent = "环境已就绪";
+    btn.title = "检查项都正常，可以直接勾选用例执行";
+    btn.disabled = true;
+  }
+}
+async function loadHealth() {
+  try {
+    const data = await api("/api/health");
+    el.connBar.classList.remove("show");
+    el.healthMeta.textContent = data.ts ? "上次探测 " + new Date(data.ts * 1000).toLocaleTimeString("zh-CN", { hour12: false }) + " · 每 5s 自动探测" : "";
+    renderHealth(data);
+    if (data.run && data.run.state === "running" && !S.polling) {
+      // 刷新页面 / 轮询中断后回来：接着看正在跑的任务
+      S.runId = data.run.id; S.run = data.run; S.logOffset = 0; S.pollRetry = 0;
+      resetLog(); setRunningUI(true); pollRun();
+    }
+  } catch (e) {
+    el.healthMeta.textContent = "探测失败";
+    el.connMsg.textContent = "环境探测拿不到数据（" + e.message + "）。服务已停止或端口不对，用例也跑不了。";
+    el.connBar.classList.add("show");
+  }
+}
+
+/* ---------------- 用例清单 ---------------- */
+function moduleLabel(prefix) {
+  const hit = S.modules.find((m) => m.prefix === prefix);
+  return hit ? hit.label : prefix;
+}
+function matches(c) {
+  const f = S.filter;
+  if (f.modules.size && !f.modules.has(c.module)) return false;
+  if (f.tags.size && !f.tags.has(c.tag)) return false;
+  if (f.q) {
+    const q = f.q.toLowerCase();
+    if (!(c.cid.toLowerCase().includes(q) || (c.title || "").toLowerCase().includes(q))) return false;
+  }
+  return true;
+}
+function visibleCases() { return S.cases.filter(matches); }
+
+function renderChips() {
+  const modCount = {}, tagCount = {};
+  S.cases.forEach((c) => {
+    modCount[c.module] = (modCount[c.module] || 0) + 1;
+    tagCount[c.tag || "（无标签）"] = (tagCount[c.tag || "（无标签）"] || 0) + 1;
+  });
+  const mainModules = S.modules.map((m) => m.prefix).filter((p) => modCount[p]);
+  const extraModules = Object.keys(modCount).filter((p) => !mainModules.includes(p)).sort();
+  el.moduleChips.innerHTML = mainModules.concat(extraModules).map((p) =>
+    `<button class="chip ${S.filter.modules.has(p) ? "on" : ""}" data-kind="module" data-val="${esc(p)}">${esc(moduleLabel(p))}<span class="n">${modCount[p]}</span></button>`
+  ).join("");
+  el.tagChips.innerHTML = Object.keys(tagCount).sort((a, b) => tagCount[b] - tagCount[a]).map((t) =>
+    `<button class="chip ${S.filter.tags.has(t) ? "on" : ""}" data-kind="tag" data-val="${esc(t)}">${esc(t)}<span class="n">${tagCount[t]}</span></button>`
+  ).join("");
+}
+
+function renderTable() {
+  const rows = visibleCases();
+  el.visCount.textContent = rows.length;
+  el.checkAll.checked = rows.length > 0 && rows.every((c) => !layerState(c).ok || S.selected.has(c.cid));
+
+  if (!rows.length) {
+    el.caseBody.innerHTML = `<tr><td colspan="6"><div class="empty">当前筛选下没有用例，换个模块 / 标签或清空搜索再试。</div></td></tr>`;
+    updatePlan();
+    return;
+  }
+  const frag = document.createDocumentFragment();
+  rows.forEach((c) => {
+    const st = layerState(c);
+    const tr = document.createElement("tr");
+    tr.dataset.cid = c.cid;
+    if (st.ok && S.selected.has(c.cid)) tr.classList.add("sel");
+    if (!st.ok) tr.classList.add("disabled");
+    const title = st.tip ? ` title="${esc(st.tip)}"` : "";
+    tr.innerHTML =
+      `<td><input type="checkbox" ${st.ok ? "" : "disabled"} ${st.ok && S.selected.has(c.cid) ? "checked" : ""}></td>` +
+      `<td class="cid">${esc(c.cid)}</td>` +
+      `<td class="ctitle">${esc(c.title)}</td>` +
+      `<td class="ctag">${esc(c.tag || "—")}</td>` +
+      `<td class="cmod">${esc(moduleLabel(c.module))}</td>` +
+      `<td><span class="st ${st.cls}"${title}>${st.text}</span></td>`;
+    frag.appendChild(tr);
+  });
+  el.caseBody.innerHTML = "";
+  el.caseBody.appendChild(frag);
+  updatePlan();
+}
+
+function updateSelCount() {
+  const rows = visibleCases();
+  const selectedVisible = rows.filter((c) => S.selected.has(c.cid)).length;
+  el.selCount.textContent = S.selected.size;
+  el.checkAll.checked = rows.length > 0 && rows.every((c) => !layerState(c).ok || S.selected.has(c.cid));
+  el.checkAll.indeterminate = selectedVisible > 0 && selectedVisible < rows.filter((c) => layerState(c).ok).length;
+  updatePlan();
+}
+
+function updatePlan() {
+  const ids = [...S.selected];
+  const rows = S.cases.filter((c) => S.selected.has(c.cid));
+  const blocked = rows.filter((c) => layerState(c).ok && (S.layer === "api" ? c.apiBlocked : c.uiBlocked)).length;
+  const layerName = S.layer === "api" ? "接口层" : "UI 层";
+  const running = S.run && S.run.state === "running";
+  const apiTip = S.layer === "api"
+    ? `<br><span style="color:var(--ink-3);font-size:11.5px">接口层全程走 HTTP，token 优先复用 .api_token；失效时会回连 MyTest 浏览器重新取一次。</span>`
+    : "";
+
+  if (!ids.length) {
+    el.plan.innerHTML = `未选择用例，先在左侧勾选要执行的内容。<br>当前视图 ${layerName} 共 <b>${visibleCases().length}</b> 条。` + apiTip;
+    el.btnRun.disabled = true;
+    el.btnRun.textContent = "开始执行";
+    return;
+  }
+  const byModule = {};
+  rows.forEach((c) => { byModule[c.module] = (byModule[c.module] || 0) + 1; });
+  const split = Object.keys(byModule).map((m) => `${esc(moduleLabel(m))} ${byModule[m]}`).join(" · ");
+  el.plan.innerHTML =
+    `将执行 <b>${ids.length}</b> 条（${layerName}）：${split}` +
+    (blocked ? `<br><span class="warnline">其中 ${blocked} 条为阻塞用例，会被标记为「阻塞」并写入报告。</span>` : "") +
+    apiTip;
+
+  if (running) { el.btnRun.disabled = true; el.btnRun.textContent = "执行中…"; }
+  else { el.btnRun.disabled = false; el.btnRun.textContent = "开始执行"; }
+}
+
+function renderLayerCounts() {
+  const ui = S.cases.filter((c) => c.ui && !c.uiBlocked).length;
+  const api = S.cases.filter((c) => c.api && !c.apiBlocked).length;
+  el.nUi.textContent = ui;
+  el.nApi.textContent = api;
+  el.layerPill.textContent = S.layer === "api" ? "接口层" : "UI 层";
+}
+
+async function loadCases(force) {
+  try {
+    const data = await api("/api/cases" + (force ? "?refresh=1" : ""));
+    S.cases = data.cases || [];
+    S.modules = data.modules || [];
+    if (!S.cases.length) throw new Error("用例清单为空");
+  } catch (e) {
+    S.cases = []; S.modules = [];
+    el.caseBody.innerHTML = `<tr><td colspan="6"><div class="empty">用例清单读取失败：${esc(e.message)}</div></td></tr>`;
+    return;
+  }
+  // 清掉在该层已不可选的选择
+  S.selected.forEach((cid) => {
+    const c = S.cases.find((x) => x.cid === cid);
+    if (!c || !layerState(c).ok) S.selected.delete(cid);
+  });
+  renderLayerCounts();
+  renderChips();
+  renderTable();
+  updateSelCount();
+}
+
+/* ---------------- 选择交互 ---------------- */
+el.caseBody.addEventListener("click", (ev) => {
+  const tr = ev.target.closest("tr[data-cid]");
+  if (!tr) return;
+  const c = S.cases.find((x) => x.cid === tr.dataset.cid);
+  if (!c || !layerState(c).ok) return;
+  if (S.selected.has(c.cid)) S.selected.delete(c.cid); else S.selected.add(c.cid);
+  tr.classList.toggle("sel", S.selected.has(c.cid));
+  tr.querySelector("input[type=checkbox]").checked = S.selected.has(c.cid);
+  updateSelCount();
+});
+el.checkAll.addEventListener("change", () => {
+  const rows = visibleCases().filter((c) => layerState(c).ok);
+  const allOn = rows.length > 0 && rows.every((c) => S.selected.has(c.cid));
+  rows.forEach((c) => allOn ? S.selected.delete(c.cid) : S.selected.add(c.cid));
+  renderTable(); updateSelCount();
+});
+document.querySelectorAll("[data-bulk]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const rows = visibleCases().filter((c) => layerState(c).ok);
+    const mode = btn.dataset.bulk;
+    if (mode === "all") rows.forEach((c) => S.selected.add(c.cid));
+    else if (mode === "clear") S.selected.clear();
+    else if (mode === "invert") rows.forEach((c) => S.selected.has(c.cid) ? S.selected.delete(c.cid) : S.selected.add(c.cid));
+    renderTable(); updateSelCount();
+  });
+});
+el.moduleChips.addEventListener("click", (ev) => {
+  const chip = ev.target.closest("[data-kind=module]"); if (!chip) return;
+  toggle(S.filter.modules, chip.dataset.val);
+  renderChips(); renderTable(); updateSelCount();
+});
+el.tagChips.addEventListener("click", (ev) => {
+  const chip = ev.target.closest("[data-kind=tag]"); if (!chip) return;
+  toggle(S.filter.tags, chip.dataset.val);
+  renderChips(); renderTable(); updateSelCount();
+});
+function toggle(set, value) { set.has(value) ? set.delete(value) : set.add(value); }
+el.search.addEventListener("input", () => { S.filter.q = el.search.value.trim(); renderTable(); updateSelCount(); });
+
+document.querySelectorAll("#layerSwitch button").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    if (S.run && S.run.state === "running") { toast("执行中不能切换执行层", true); return; }
+    if (btn.dataset.layer === S.layer) return;
+    S.layer = btn.dataset.layer;
+    document.querySelectorAll("#layerSwitch button").forEach((b) => b.classList.toggle("active", b.dataset.layer === S.layer));
+    S.selected.clear();
+    renderLayerCounts(); renderTable(); updateSelCount();
+  });
+});
+
+/* ---------------- 运行控制 ---------------- */
+function setRunningUI(running) {
+  el.btnStop.style.display = running ? "" : "none";
+  el.btnRun.style.display = running ? "none" : "";
+  el.logLive.style.display = running ? "" : "none";
+  document.querySelector(".side").classList.toggle("running", !!running);
+  const pill = document.querySelector("#runPill");
+  if (running) {
+    el.runDot.className = "dot live";
+    pill.querySelector("b").textContent = "执行中";
+  } else {
+    el.runDot.className = "dot ok";
+    pill.querySelector("b").textContent = "空闲";
+  }
+  updatePlan();
+}
+
+async function startRun() {
+  const ids = [...S.selected];
+  if (!ids.length) { toast("先勾选要执行的用例", true); return; }
+  const payload = {
+    ids, layer: S.layer,
+    update_xlsx: $("optUpdate").checked,
+    keep_data: $("optKeep").checked,
+    allure: $("optAllure").checked,
+  };
+  el.btnRun.disabled = true;
+  el.btnRun.textContent = "启动中…";
+  try {
+    const data = await api("/api/run", { method: "POST", body: JSON.stringify(payload) });
+    S.runId = data.id; S.logOffset = 0; S.run = null;
+    resetLog();
+    el.progress.classList.add("show");
+    el.reportRow.classList.remove("show");
+    el.pCur.textContent = "正在启动浏览器会话…";
+    el.pPct.textContent = "0%";
+    el.pbarFill.style.width = "0%";
+    [["cPass", 0], ["cFail", 0], ["cBlock", 0], ["cErr", 0]].forEach(([k]) => el[k].textContent = "0");
+    setRunningUI(true);
+    pollRun();
+    toast("已启动，日志实时输出中");
+  } catch (e) {
+    toast("启动失败：" + e.message, true);
+    el.btnRun.disabled = false;
+    el.btnRun.textContent = "开始执行";
+  }
+}
+
+async function stopRun() {
+  // 不用 confirm：原生弹窗会阻塞页面主线程，把正在跑的日志轮询一起卡死
+  if (!S.run || S.run.state !== "running") { toast("当前没有运行中的任务"); return; }
+  el.btnStop.disabled = true;
+  el.btnStop.textContent = "停止中";
+  try {
+    const data = await api("/api/stop", { method: "POST", body: "{}" });
+    toast(data.message || "已请求停止");
+  } catch (e) {
+    toast("停止失败：" + e.message, true);
+  } finally {
+    el.btnStop.disabled = false;
+    el.btnStop.textContent = "停止";
+  }
+}
+
+function resetLog() {
+  el.log.innerHTML = "";
+  el.logMeta.textContent = "";
+}
+
+function classify(line) {
+  if (/^\s+OK\s+通过/.test(line)) return " ok";
+  if (/^\s+FAIL\s+失败/.test(line)) return " fail";
+  if (/^\s+ERR\s+异常/.test(line)) return " err";
+  if (/^\s+SKIP\s+阻塞|^\s+N\/A\s+未覆盖/.test(line)) return " skip";
+  if (/^\[面板\]|^报告：|^Allure：/.test(line)) return " hl";
+  if (/^\[\s*\d+\/\d+\]/.test(line)) return " hl";
+  return "";
+}
+
+function appendLog(lines) {
+  if (!lines || !lines.length) return;
+  const frag = document.createDocumentFragment();
+  lines.forEach((line) => {
+    const div = document.createElement("div");
+    div.className = "ln" + classify(line);
+    div.textContent = line || " ";
+    frag.appendChild(div);
+  });
+  el.log.appendChild(frag);
+  while (el.log.childElementCount > 2400) el.log.removeChild(el.log.firstChild);
+  if (S.logFollow) el.log.scrollTop = el.log.scrollHeight;
+}
+
+el.log.addEventListener("scroll", () => {
+  const nearBottom = el.log.scrollHeight - el.log.scrollTop - el.log.clientHeight < 60;
+  S.logFollow = nearBottom;
+});
+
+function renderRun(run) {
+  const p = run.progress || { done: 0, total: 0 };
+  const total = p.total || (run.ids ? run.ids.length : 0);
+  const done = Math.min(p.done || 0, total || p.done || 0);
+  const pct = total ? Math.round((done / total) * 100) : (run.state === "running" ? 4 : 100);
+  el.pbarFill.style.width = Math.max(2, pct) + "%";
+  el.pPct.textContent = total ? `${pct}% · ${done}/${total}` : `${pct}%`;
+
+  if (run.state === "running") {
+    el.pCur.textContent = run.current ? `正在执行 ${run.current}` : `执行中 · 已用时 ${fmtDur(run.elapsed)}`;
+  } else {
+    el.pCur.textContent = run.state === "done" ? `执行完成 · 用时 ${fmtDur(run.elapsed)}`
+      : run.state === "stopped" ? `已停止 · 用时 ${fmtDur(run.elapsed)}`
+      : `执行中断（返回码 ${run.returncode}）· 先看环境监控和日志`;
+  }
+  const c = run.counts || {};
+  el.cPass.textContent = c.pass || 0;
+  el.cFail.textContent = c.fail || 0;
+  el.cBlock.textContent = c.blocked || 0;
+  el.cErr.textContent = c.error || 0;
+
+  if (run.report) {
+    const name = String(run.report).split(/[\\/]/).pop();
+    el.reportPath.textContent = "报告 " + name;
+    el.reportPath.title = run.report;
+    el.btnReport.dataset.path = run.report;
+    el.reportRow.classList.add("show");
+  }
+  el.logMeta.textContent = total ? `${done}/${total} 条 · ${fmtDur(run.elapsed)}` : fmtDur(run.elapsed);
+}
+
+async function pollRun() {
+  if (!S.runId) return;
+  S.polling = true;
+  try {
+    const run = await api(`/api/run?offset=${S.logOffset}&id=${encodeURIComponent(S.runId)}`);
+    if (run.state === "idle") { S.polling = false; return; }
+    S.pollRetry = 0;
+    S.run = run;
+    el.progress.classList.add("show");
+    appendLog(run.log);
+    S.logOffset = run.nextOffset || S.logOffset;
+    renderRun(run);
+
+    if (run.state === "running") {
+      setTimeout(pollRun, 900);
+      return;
+    }
+    S.polling = false;
+    setRunningUI(false);
+    const c = run.counts || {};
+    if (run.state === "done") {
+      toast(`执行完成：通过 ${c.pass || 0} · 失败 ${c.fail || 0} · 阻塞 ${c.blocked || 0}`);
+    } else if (run.state === "stopped") {
+      toast("已停止");
+    } else {
+      toast("执行没跑起来：先确认 MyTest 浏览器已打开并登录", true);
+    }
+    loadHealth();
+  } catch (e) {
+    // 网络抖动不该让页面卡在「执行中」：连续失败 5 次（约 5s）才放弃
+    S.pollRetry = (S.pollRetry || 0) + 1;
+    if (S.pollRetry <= 5) {
+      setTimeout(pollRun, 900);
+      return;
+    }
+    S.polling = false;
+    toast("获取运行状态失败：" + e.message, true);
+  }
+}
+
+/* ---------------- 事件绑定 ---------------- */
+el.btnRun.addEventListener("click", startRun);
+el.btnStop.addEventListener("click", stopRun);
+el.btnReport.addEventListener("click", async () => {
+  const path = el.btnReport.dataset.path;
+  if (!path) return;
+  try { await api("/api/open", { method: "POST", body: JSON.stringify({ path }) }); toast("已用默认程序打开报告"); }
+  catch (e) { toast("打开失败：" + e.message, true); }
+});
+$("btnRefresh").addEventListener("click", async (ev) => {
+  const btn = ev.currentTarget;
+  btn.disabled = true; btn.textContent = "刷新中…";
+  try {
+    await api("/api/refresh", { method: "POST", body: "{}" });
+    await loadCases(); await loadHealth();
+    toast("环境与用例清单已刷新");
+  } catch (e) { toast("刷新失败：" + e.message, true); }
+  btn.disabled = false; btn.textContent = "刷新环境";
+});
+el.healthGrid.addEventListener("click", async (ev) => {
+  const btn = ev.target.closest("[data-action=open-browser]");
+  if (!btn) return;
+  btn.disabled = true; btn.textContent = "启动中…";
+  try {
+    await api("/api/open-browser", { method: "POST", body: "{}" });
+    toast("已启动 MyTest，等待就绪…");
+    setTimeout(loadHealth, 3000);
+  } catch (e) { toast("启动失败：" + e.message, true); }
+  btn.disabled = false; btn.textContent = "启动浏览器";
+});
+
+/* ---------------- 执行与准备 ---------------- */
+async function prepareEnv() {
+  const label = "一键准备环境";
+  el.btnPrepare.disabled = true;
+  el.btnPrepare.textContent = "准备中…";
+  try {
+    const data = await api("/api/prepare", { method: "POST", body: "{}" });
+    const actions = data.actions || [];
+    const failed = actions.filter((a) => !a.ok);
+    if (failed.length) toast(failed[0].msg, true);
+    else toast(actions.length ? actions[0].msg : "环境已就绪");
+    await loadHealth();
+    // 浏览器启动 + CDP 就绪要几秒，补几次探测，卡片会自己变色
+    [2500, 5000, 9000].forEach((t) => setTimeout(loadHealth, t));
+  } catch (e) {
+    toast("准备环境失败：" + e.message, true);
+  } finally {
+    el.btnPrepare.textContent = label;
+    syncPrepareBtn();
+  }
+}
+
+/* ---------------- 启动 ---------------- */
+(async function init() {
+  if (FILE_MODE) {
+    // file:// 下所有 /api 请求都会打到本地文件路径上，一个都成功不了；
+    // 把原因和正确地址直接写在页面上，别让人对着空表格猜。
+    el.connTitle.textContent = "页面不是从控制台地址打开的";
+    el.connMsg.innerHTML =
+      `当前是 <code>file://</code> 方式，取不到数据。请先运行 ` +
+      `<code>python dashboard_server.py</code>，再访问 <code>${SERVICE_URL}</code>`;
+    el.connBar.classList.add("show");
+    el.connRetry.style.display = "none";
+    el.btnPrepare.disabled = true;
+    el.healthMeta.textContent = "未连接";
+
+    el.healthGrid.innerHTML =
+      `<div class="hintcard">环境监控需要控制台服务提供数据</div>`;
+    el.caseBody.innerHTML =
+      `<tr><td colspan="6"><div class="empty">请访问 ${SERVICE_URL} 打开本页</div></td></tr>`;
+    el.plan.textContent = "需从控制台地址打开才能读取用例清单。";
+    el.btnRun.disabled = true;
+    return;
+  }
+
+  el.connRetry.addEventListener("click", async () => {
+    await loadHealth();
+    if (!el.connBar.classList.contains("show")) toast("已恢复连接");
+  });
+  el.btnPrepare.addEventListener("click", prepareEnv);
+
+  await loadCases();
+  await loadHealth();
+  setInterval(loadHealth, 6000);
+})();
+</script>
+</body>
+</html>

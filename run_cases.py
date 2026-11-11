@@ -263,57 +263,71 @@ def _ask_ids(known):
         return {"only": ",".join(valid)}
 
 
-def _count_by(key_func):
-    """按 key 统计 (总数, 可自动数)，保持首次出现顺序。"""
+def _count_by(key_func, layer="ui"):
+    """按 key 统计 (总数, 可自动数)，只看该层的执行计划，保持首次出现顺序。"""
     counts = {}
-    for item in registry.all_cases():
+    for item in registry.select(layer=layer):
         total, run = counts.get(key_func(item), (0, 0))
-        counts[key_func(item)] = (total + 1, run + (1 if item.runnable else 0))
+        counts[key_func(item)] = (total + 1, run + (1 if item.runnable_on(layer) else 0))
     return counts
 
 
-def _menu_modules():
-    counts = _count_by(lambda item: registry.prefix_of(item.cid))
+def _menu_modules(layer="ui"):
+    counts = _count_by(lambda item: registry.prefix_of(item.cid), layer=layer)
     ordered = [p for p in MODULE_LABELS if p in counts] + \
               [p for p in counts if p not in MODULE_LABELS]
-    print("\n 选择模块（可多选）：")
+    print(f"\n 选择模块（{_layer_name(layer)}层，可多选）：")
     for i, prefix in enumerate(ordered, 1):
         total, run = counts[prefix]
         print(f"   {i}  {_pad(module_label(prefix), 32)}{total:>3} 条（可自动 {run}）")
     return ordered
 
 
-def _menu_tags():
-    counts = _count_by(lambda item: item.tag)
+def _menu_tags(layer="ui"):
+    counts = _count_by(lambda item: item.tag, layer=layer)
     ordered = sorted(counts, key=lambda t: (-counts[t][0], t))
-    print("\n 选择标签（可多选）：")
+    print(f"\n 选择标签（{_layer_name(layer)}层，可多选）：")
     for i, tag in enumerate(ordered, 1):
         total, run = counts[tag]
         print(f"   {i}  {_pad(tag or '(无标签)', 12)}{total:>3} 条（可自动 {run}）")
     return ordered
 
 
-def _confirm_plan(planned, state):
+def _layer_name(layer):
+    return "接口" if layer == "api" else "UI"
+
+
+def _layer_stats(layer):
+    """该层的 (可自动条数, 执行计划条数)。"""
+    planned = registry.select(layer=layer)
+    return sum(1 for item in planned if item.runnable_on(layer)), len(planned)
+
+
+def _confirm_plan(planned, state, layer="ui"):
     """展示待执行范围求确认。True=开始 / False=重选 / None=退出。"""
     if not planned:
         print("\n 没有匹配的用例，请重新选择")
         return False
 
     total = len(planned)
-    runnable = sum(1 for item in planned if item.runnable)
+    runnable = sum(1 for item in planned if item.runnable_on(layer))
     print("\n" + "-" * 60)
-    print(f" 待执行 {total} 条：可自动 {runnable} 条，阻塞/人工 {total - runnable} 条")
+    print(f" 待执行 {total} 条（{_layer_name(layer)}层）：可自动 {runnable} 条，"
+          f"阻塞/人工 {total - runnable} 条")
     if runnable == 0:
         print(" 这些用例都需要人工执行，脚本跑不了")
         print("-" * 60)
         return False
     if total <= 10:
         for item in planned:
-            print(f"   {'·' if item.runnable else '×'} {item.cid}  {item.title}")
+            print(f"   {'·' if item.runnable_on(layer) else '×'} {item.cid}  {item.title}")
     else:
         print(f"   起 {planned[0].cid} … 止 {planned[-1].cid}")
     print("-" * 60)
-    print("  回车 = 开始    u = 开始并回填用例表    n = 返回重选")
+    if layer == "api":
+        print("  回车 = 开始    u = 开始并回填用例表（会覆盖同编号的 UI 结果）    n = 返回重选")
+    else:
+        print("  回车 = 开始    u = 开始并回填用例表    n = 返回重选")
 
     while True:
         raw = _ask(" 请确认 [回车]: ", "")
@@ -330,36 +344,129 @@ def _confirm_plan(planned, state):
         print("  请输入 回车 / u / n")
 
 
+def _main_menu():
+    """主菜单：返回选项字符（1~6 / q），None 表示退出。"""
+    ui_run, ui_plan = _layer_stats("ui")
+    api_run, api_plan = _layer_stats("api")
+    print("\n" + "=" * 66)
+    print(" 管伊佳ERP 自动化")
+    print(f" UI 层 {ui_plan} 条（可自动 {ui_run}）　"
+          f"接口层 {api_plan} 条（可自动 {api_run}）")
+    print("=" * 66)
+    print("   1  全部执行（UI）")
+    print("   2  按模块执行（UI）")
+    print("   3  按标签执行（UI）")
+    print("   4  输入用例编号（UI）")
+    print("   5  接口层执行（全部 / 按模块 / 按编号）")
+    print("   6  只看清单，不执行")
+    print("   q  退出")
+
+    while True:
+        choice = _ask("\n 请选择 [1]: ", "1")
+        if choice is None:
+            return None
+        choice = choice.lower()
+        if choice in ("1", "2", "3", "4", "5", "6", "q"):
+            return choice
+        print("  没有这个选项，请输入 1~6 或 q")
+
+
+def _api_menu():
+    """接口层子菜单：返回 (action, filters)；(back, None) 表示回主菜单。"""
+    api_run, api_plan = _layer_stats("api")
+    while True:
+        print("\n" + "-" * 64)
+        print(f" 接口层：直接打后端，不经过浏览器　{api_plan} 条，可自动 {api_run} 条")
+        print("-" * 64)
+        print("   1  全部执行")
+        print("   2  按模块执行")
+        print("   3  输入用例编号")
+        print("   4  只看清单")
+        print("   b  返回主菜单")
+
+        choice = _ask("\n 请选择 [1]: ", "1")
+        if choice is None:
+            return None
+        choice = choice.lower()
+        if choice == "b":
+            return ("back", None)
+        if choice == "4":
+            return ("list", None)
+        if choice == "1":
+            return ("run", {})
+        if choice == "2":
+            try:
+                options = _menu_modules("api")
+                picks = _ask_multi(options, "\n 请输入序号（如 1 或 1,3；b 返回）: ")
+            except _Back:
+                continue
+            if picks is None:
+                return None
+            return ("run", {"module": [options[i] for i in picks]})
+        if choice == "3":
+            known = {item.cid for item in registry.select(layer="api")}
+            try:
+                filters = _ask_ids(known)
+            except _Back:
+                continue
+            if filters is None:
+                return None
+            return ("run", filters)
+        print("  没有这个选项，请输入 1~4、b 或 q")
+
+
+def _api_flow():
+    """接口层完整流程：选范围 → 确认执行。
+
+    返回 ("list", "api") / ("run", filters, update_xlsx, "api") / "back"（回主菜单）/ None（退出）。
+    """
+    while True:
+        picked = _api_menu()
+        if picked is None:
+            return None
+        action, filters = picked
+        if action == "back":
+            return "back"
+        if action == "list":
+            return ("list", "api")
+
+        planned = registry.select(
+            only=filters["only"].split(",") if filters.get("only") else None,
+            tags=filters.get("tag"),
+            prefixes=filters.get("module"),
+            layer="api",
+        )
+        state = {"update_xlsx": False}
+        verdict = _confirm_plan(planned, state, "api")
+        if verdict is None:
+            return None
+        if verdict:
+            return ("run", filters, state["update_xlsx"], "api")
+        # 取消就回到接口子菜单重选，不回主菜单
+
+
 def interactive_menu():
     """无参数启动时的引导菜单。
 
-    返回 ("list",) / ("run", 筛选条件 dict, 是否回填 xlsx) / None（用户退出）。
+    返回 ("list", layer) / ("run", 筛选条件 dict, 是否回填 xlsx, layer) / None（用户退出）。
+    主菜单 1~4 走 UI 层（原行为不变），5 进入接口层子菜单。
     """
-    cases_all = registry.all_cases()
-    runnable = sum(1 for item in cases_all if item.runnable)
-
     while True:
-        print("\n" + "=" * 62)
-        print(" 管伊佳ERP UI 自动化")
-        print(f" 共 {len(cases_all)} 条：可自动 {runnable} 条，阻塞/人工 {len(cases_all) - runnable} 条")
-        print("=" * 62)
-        print("   1  全部执行")
-        print("   2  按模块执行（多单位 / 商品信息 / 仓库信息）")
-        print("   3  按标签执行（页面入口 / 查询 / 新增 …）")
-        print("   4  输入用例编号")
-        print("   5  只看清单，不执行")
-        print("   q  退出")
-
-        choice = _ask("\n 请选择 [1]: ", "1")
-        if choice is None or choice.lower() == "q":
+        choice = _main_menu()
+        if choice is None or choice == "q":
             return None
-        if choice == "5":
-            return ("list",)
+        if choice == "6":
+            return ("list", "ui")
 
-        if choice == "1":
-            filters = {}
-        elif choice in ("2", "3"):
-            options = _menu_modules() if choice == "2" else _menu_tags()
+        if choice == "5":
+            result = _api_flow()
+            if result == "back":
+                continue
+            return result
+
+        layer, filters = "ui", {}
+        if choice in ("2", "3"):
+            options = _menu_modules(layer) if choice == "2" else _menu_tags(layer)
             key = "module" if choice == "2" else "tag"
             try:
                 picks = _ask_multi(options, "\n 请输入序号（如 1 或 1,3；b 返回）: ")
@@ -370,26 +477,24 @@ def interactive_menu():
             filters = {key: [options[i] for i in picks]}
         elif choice == "4":
             try:
-                filters = _ask_ids({item.cid for item in cases_all})
+                filters = _ask_ids({item.cid for item in registry.select(layer=layer)})
             except _Back:
                 continue
             if filters is None:
                 return None
-        else:
-            print(f"  没有「{choice}」这个选项，请输入 1~5 或 q")
-            continue
 
         planned = registry.select(
             only=filters["only"].split(",") if filters.get("only") else None,
             tags=filters.get("tag"),
             prefixes=filters.get("module"),
+            layer=layer,
         )
         state = {"update_xlsx": False}
-        verdict = _confirm_plan(planned, state)
+        verdict = _confirm_plan(planned, state, layer)
         if verdict is None:
             return None
         if verdict:
-            return ("run", filters, state["update_xlsx"])
+            return ("run", filters, state["update_xlsx"], layer)
         # 否则回到菜单重选
 
 
@@ -501,16 +606,19 @@ def main(argv=None):
                 print("\n已退出")
                 return 0
             if menu[0] == "list":
+                args.layer = menu[1] if len(menu) > 1 else "ui"
                 return cmd_list(args)
-            _, filters, update_xlsx = menu
+            _, filters, update_xlsx, layer = menu
+            args.layer = layer
             for key in ("only", "tag", "module"):
                 if filters.get(key):
                     setattr(args, key, filters[key])
             if update_xlsx:
                 args.update_xlsx = True
         else:
-            print("[提示] 当前不是交互终端，直接执行全部用例；"
-                  "要选范围请加 --module / --tag / --only，或运行 run_cases.py list 查看清单")
+            print("[提示] 当前不是交互终端，直接执行全部 UI 用例；"
+                  "要选范围请加 --module / --tag / --only，跑接口层加 --layer api，"
+                  "或运行 run_cases.py list 查看清单")
 
     if args.command == "list":
         return cmd_list(args)

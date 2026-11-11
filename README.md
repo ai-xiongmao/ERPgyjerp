@@ -8,7 +8,7 @@
 | UI（默认） | 在桌面 MyTest 浏览器里点页面 | 117 | 10~30 秒 | 端到端验证，看得到界面反馈 |
 | 接口 | 直接打后端 `/jshERP-boot/*` | 71 | 0.2~3 秒 | 快速回归、校验服务端真实约束 |
 
-两层都自带断言、测试数据回收，以及 **Markdown / JSON / Allure** 三种执行报告。
+两层都自带断言、测试数据回收，以及 **Markdown / Allure** 两种执行报告。
 表里是「能自动跑的条数」，另有 UI 8 条 / 接口 7 条为阻塞（需人工或前置不具备），
 脚本会如实标「阻塞」而不是假装通过，明细见「用例覆盖」。
 
@@ -27,7 +27,7 @@
 
 1. 首次运行需要 MyTest 浏览器开着并已登录——从中取一次 `x-access-token` 并缓存到 `.api_token`；
 2. 之后**浏览器不开也能跑**，可进 CI。token 失效（服务端返回登录过期）会自动回源重取，
-   此时仍需浏览器在线；浏览器也不在就报错退出，不会静默跑空。
+   此时仍需浏览器在线；浏览器也不在时，每条用例的前置检查都会失败并记「阻塞」，整轮照常跑完，不会拿失效 token 硬跑成一片失败。
 
 ## 安装
 
@@ -46,24 +46,62 @@ Allure 需要机器上有 **Java 11+**（当前环境是 Java 21）。只跑用�
 
 ## 运行
 
+### 可视化控制台（日常推荐）
+
+```bash
+./.venv/Scripts/python.exe dashboard_server.py
+```
+
+服务监听 http://127.0.0.1:8760/ ，起来后自动打开浏览器。整个控制台就两个文件：
+`dashboard_server.py` 提供接口与执行，`dashboard/index.html` 是页面。页面每次请求实时读取，
+改 HTML 不用重启服务。
+
+一屏三块：
+
+- **环境监控** —— 控制台服务、MyTest 浏览器（CDP 9231）、业务页面/登录页、目标站点、
+  用例库条数、playwright 依赖，每 5 秒自动探一轮。没就绪的卡片上直接带修复按钮。
+- **用例选择** —— UI / 接口层切换，按模块、标签、关键词筛选，逐条勾选或「全选可执行」；
+  表格里直接标出该层「可执行 / 阻塞 / 该层无实现」，「该层无实现」的行不可勾选；阻塞行可以勾，执行时如实记「阻塞」并写进报告。
+- **执行配置 + 实时日志** —— 勾好点「开始执行」，等价于跑
+  `run_cases.py run --only <勾选的编号> [--layer api]`；日志实时流回页面，
+  进度、通过/失败/阻塞/异常计数、报告入口都在同一块，随时可「停止」。
+
+顶栏的 **「一键准备环境」** 会按当前检查结果决定做什么，只做缺的那步：
+
+- MyTest 没启动 → 按钮显示「启动 MyTest」，点了拉起桌面快捷方式；
+- 浏览器已开但没有业务页 → 显示「打开业务页」，点了在浏览器里新开一个；
+- 都齐了 → 显示「环境已就绪」并置灰，不会重复启动。
+
+参数：`--port 8800` 换端口（也可用环境变量 `ERP_DASH_PORT`）、`--no-browser` 不自动开浏览器。
+面板只监听回环地址（`127.0.0.1` + `::1`，不对外暴露），写操作校验 Origin，「打开报告」只允许 `reports/` 下的文件。
+
+**必须通过 http 地址访问，不要双击 `dashboard/index.html`。** 用 `file://` 打开时浏览器访问不到
+`/api/*`，页面取不到任何数据；这种情况下页面顶部会直接写明原因和正确的访问地址。
+
+两个和"看起来像页面坏了"有关的行为：
+
+- 端口已被占用（比如重复启动）时**不会再起第二个实例**，而是提示「已有控制台在运行」并直接打开它；
+- 服务中途停掉时页面顶部会出红色「控制台服务未连接」条，服务恢复后自动消失，不用手动刷新。
+
 ### 交互式（手动跑推荐）
 
 ```bash
 ./.venv/Scripts/python.exe run_cases.py
 ```
 
-不带任何参数时先进菜单，选好范围再执行：
+不带任何参数时先进菜单，选好范围再执行（UI / 接口两层都能从菜单启动）：
 
 ```
-==============================================================
- 管伊佳ERP UI 自动化
- 共 125 条：可自动 117 条，阻塞/人工 8 条
-==============================================================
-   1  全部执行
-   2  按模块执行（多单位 / 商品信息 / 仓库信息）
-   3  按标签执行（页面入口 / 查询 / 新增 …）
-   4  输入用例编号
-   5  只看清单，不执行
+==================================================================
+ 管伊佳ERP 自动化
+ UI 层 125 条（可自动 117）　接口层 78 条（可自动 71）
+==================================================================
+   1  全部执行（UI）
+   2  按模块执行（UI）
+   3  按标签执行（UI）
+   4  输入用例编号（UI）
+   5  接口层执行（全部 / 按模块 / 按编号）
+   6  只看清单，不执行
    q  退出
 
  请选择 [1]:
@@ -72,8 +110,28 @@ Allure 需要机器上有 **Java 11+**（当前环境是 Java 21）。只跑用�
 - 选 2 / 3 会再列出模块或标签（各自带条数与可自动数），可单选也可多选：`1`、`1,3`、`1-3`
 - 选 4 支持逗号与同前缀区间：`TC-DEP-001,TC-DEP-005`、`TC-DEP-001-010`
 - 选完先显示「待执行 N 条」：回车开始、`u` 开始并回填用例表、`n` 返回重选
-- 二级菜单里输 `b` 可返回主菜单，输错序号会原地重问，不会把你踢回顶层
-- 菜单只跑 **UI 层**；要跑接口层用 `run_cases.py run --layer api`（见下文）
+- 二级菜单里输 `b` 可返回主菜单，输错序号会原地重问，不会把你踢到顶层
+
+选 5 进入接口层子菜单（不走浏览器，直接打后端）：
+
+```
+----------------------------------------------------------------
+ 接口层：直接打后端，不经过浏览器　78 条，可自动 71 条
+----------------------------------------------------------------
+   1  全部执行
+   2  按模块执行
+   3  输入用例编号
+   4  只看清单
+   b  返回主菜单
+
+ 请选择 [1]:
+```
+
+- 接口层的「按模块」只列该层有实现的模块（多单位 31 / 商品信息 22 / 仓库信息 25，含阻塞条目）
+- 接口层的「输入用例编号」只认该层有的编号，纯 UI 的编号会被忽略并提示
+- 确认页会标注「接口层」，回填按钮也换成提示：`u` 会**覆盖同编号的 UI 结果**，两层都跑过就别急着回填
+- 在接口子菜单里按 `n` 回到**接口子菜单**继续选，按 `b` 才回主菜单
+- 菜单执行与 `run_cases.py run --layer api` 等价，只是省得记参数
 
 ### 直接指定（脚本 / CI）
 
@@ -145,7 +203,7 @@ Allure 需要机器上有 **Java 11+**（当前环境是 Java 21）。只跑用�
 Allure：reports/allure-report/20261103_182121.html
 ```
 
-退出码：`0` 全绿；`1` 有失败/异常；`2` 登录失效需要人工重新登录。
+退出码：`0` 全绿；`1` 有失败/异常；`2` 登录失效需要人工重新登录；`130` 手动中断（Ctrl-C）。
 
 ## 接口自动化（--layer api）
 
@@ -175,7 +233,8 @@ Allure：reports/allure-report/20261103_182121.html
 - 前缀 `/jshERP-boot`，认证只有一个请求头 `x-access-token`（39 位）；
 - **业务失败也返回 HTTP 200**，必须看响应体的 `code`：`200` 成功、`300` 查询异常、
   `301` 写入异常、`500` 未知异常、`8000005` 业务提示；
-- 错误提示在 `data.message`，**不在**顶层 `message`；
+- 错误提示优先取 `data.message`；取不到时 `extract_message` 会回退到 `data` 字符串和顶层 `message`，
+  写断言别只读顶层 `message`；
 - 列表接口不传 `field` 会返回全字段（编辑时可直接拿列表行构造 body）；传了 `field` 就只返回这些列；
 - 删除/状态类沿用前端习惯：`ids` 形如 `"1,2,"`（每个 id 后面都带逗号），单条删除用 `{"id": x}`。
 
@@ -196,7 +255,8 @@ Allure：reports/allure-report/20261103_182121.html
 首次从 MyTest 浏览器 localStorage 的 `pro__Access-Token` 取值并缓存到项目根 `.api_token`
 （已加 gitignore，**不要提交**），之后浏览器不开也能跑；token 失效会自动回源重取。
 
-token 打不开局面时会直接报错退出，不会静默跑成一片失败——接口层没有「等人工重新登录」这条路径，
+token 打不开局面时，每条用例会在「前置：登录态检查」这一步失败并记「阻塞」——整轮仍会跑完，
+但报告里是一片带原因的阻塞，不会用失效 token 硬跑成一片失败。接口层没有「等人工重新登录」这条路径，
 需要时先打开 MyTest 登录一次即可。
 
 ### 数据纪律（接口层专属）
@@ -241,7 +301,7 @@ HTTP 客户端在 `framework/api_client.py`，造数与回收在 `framework/api_
 | **Allure** | `reports/allure-report/<时间戳>.html` | 交互式：按模块/标签分层、看步骤、看失败截图。文件名带时间戳，历史报告不覆盖 |
 
 两层报告同名同格式，靠**报告头的「执行层」**区分（`UI` / `接口`）：
-Markdown 第二行会写「执行层：接口（另有一层实现时，请分别执行）」，避免把接口结果误读成页面结果。
+Markdown 报告头部的元信息区会写「执行层：接口（另有一层实现时，请分别执行）」，避免把接口结果误读成页面结果。
 
 > 同一编号两层都跑过时，`--update-xlsx` 会互相覆盖「执行结果」列（后跑的盖掉先跑的）。
 > 只想回填某一层的结论，就先只跑那一层再回填；要同时保留两层结论，建议一层回填一次、
@@ -312,6 +372,10 @@ ERPgyjerp/
 ├── requirements.txt            # playwright / openpyxl / allure-python-commons
 ├── 管伊佳ERP-测试用例.xlsx      # 用例来源，也是 --update-xlsx 的回填目标（回填前自动备份）
 ├── .api_token                  # 接口层 token 缓存（已 gitignore，不要提交）
+├── dashboard_server.py         # 控制台后端：环境探测 / 用例清单 / 起停执行 / 日志流
+├── dashboard/
+│   └── index.html              # 控制台单页：环境监控 + 用例选择 + 执行配置与日志
+│                               #   （.cache/ 存用例清单缓存与 server.log，已 gitignore）
 │
 ├── framework/                  # 与业务无关的执行骨架
 │   ├── registry.py             # 用例注册表：@case 注册 UI 实现，@api_case 挂接口实现（同编号双轨）
@@ -330,12 +394,13 @@ ERPgyjerp/
 │   └── depot_page.py           # 仓库信息：增删改查 + 设为默认 + 启用禁用 + 负责人下拉
 │
 ├── apis/                       # 接口封装（对标 pages/）：只组装请求与解析响应，不含断言
-│   ├── base.py                 # 公共基类：ok / reject / raw / find / all、ids 形态、错误码
+│   ├── base.py                 # 公共基类：list / all / count、ids 形态、code_msg 错误码
 │   ├── unit_api.py             # 多单位：list / getAllList / add / update / batchSetStatus / delete
 │   ├── material_api.py         # 商品：list / add / update / 批量 / 条码 / 条码明细 / 类别树 / 属性
 │   └── depot_api.py            # 仓库：list / getAllListWithStock / add / update / 状态 / 删除 / 设为默认
 │
 ├── cases/                      # 用例：一个函数 = 一条用例，文件名按标签划分
+│   ├── __init__.py             # 导入即注册：新增用例文件必须在这里加一行 import
 │   ├── _helpers.py             # 公共小工具：单位名拼接、提示文案匹配
 │   ├── c_*.py                  # UI 层实现（c_entry / c_list / c_query / c_create / c_edit /
 │   │                           #   c_status / c_delete / c_product / c_material / c_depot）
@@ -355,13 +420,13 @@ ERPgyjerp/
 │   └── allure/                 # 随项目安装的 allure-commandline（node_modules 不入库）
 │
 └── reports/                    # 运行产物（已 gitignore）
-    ├── run_<时间戳>.md          # 人读报告（第二行标注执行层 UI / 接口）
-    ├── run_<时间戳>.json        # 结构化结果：执行层、运行前缀、汇总、逐条用例结果
+    ├── run_<时间戳>.md          # 人读报告（头部标注执行层 UI / 接口）
     ├── allure-results/         # Allure 原始结果，每次运行前清空
-    └── allure-report/          # <时间戳>.html 单文件报告，双击即可用浏览器打开
+    └── allure-report/          # <时间戳>.html（默认）/ <时间戳>/index.html（--allure multi）
 ```
 
-> `framework/__init__.py`、`pages/__init__.py`、`apis/__init__.py` 只有包说明 docstring，无逻辑；
+> `framework/__init__.py`、`pages/__init__.py` 只有包说明 docstring；`apis/__init__.py` 额外导出
+> `UnitApi / MaterialApi / DepotApi` 三个类（`from apis import UnitApi` 可直接用）；
 > `--update-xlsx` 产生的备份落在同一目录，形如 `管伊佳ERP-测试用例.bak_<时间戳>.xlsx`。
 
 ## 用例覆盖
@@ -551,7 +616,7 @@ ERP_RELOGIN_WAIT=0   ./.venv/Scripts/python.exe run_cases.py   # 无人值守：
 ### 接口层不同
 
 接口层**没有**「等你重新登录」这条路径：token 失效时 `ApiClient` 会先回源到浏览器重取一次，
-取不到（浏览器没开或也没登录）就直接抛错退出，不会用过期 token 硬跑成一片 `loginOut` 失败。
+取不到（浏览器没开或也没登录）时，每条用例的前置检查都失败并记「阻塞」，不会用过期 token 硬跑成一片 `loginOut` 失败。
 
 ```bash
 # token 缓存被清 / 服务端踢下线：开一次 MyTest 登录，再跑即可
@@ -566,16 +631,19 @@ ERP_RELOGIN_WAIT=0   ./.venv/Scripts/python.exe run_cases.py   # 无人值守：
 
 ### 唯一入口
 
-所有 UI 动作必须走 `pages/base_page.py` 的封装，**禁止在用例（`cases/`）里直接调 `page.click()` / `page.fill()`**：
+所有 UI 动作必须走 `pages/` 的页面对象封装（`BasePage` 及其子类），**禁止在用例（`cases/`）里直接调 `page.click()` / `page.fill()`**：
 
-| 动作 | 封装方法 | 间隔 |
-|---|---|---|
-| 点工具栏按钮 | `click_button(text)` | 1s |
-| 填输入框 | `fill(target, value)` | 1s |
-| 点确认框「确定」 | `click_confirm()` | 1s |
-| 关闭弹窗 | `cancel_modal()` | 1s |
-| 删除确认 / 取消 | `click_popconfirm_ok()` / `click_popconfirm_cancel()` | 1s |
-| 翻页 | `goto_page()` / `next_page()` | 1s |
+| 动作 | 封装方法 | 所在类 | 间隔 |
+|---|---|---|---|
+| 点工具栏按钮 | `click_button(text)` | BasePage | 1s |
+| 填输入框 | `fill(target, value)` | BasePage | 1s |
+| 点确认框「确定」 | `click_confirm()` | BasePage | 1s |
+| 关闭弹窗 | `cancel_modal()` | BasePage | 1s |
+| 删除确认 / 取消 | `click_popconfirm_ok()` / `click_popconfirm_cancel()` | UnitPage / DepotPage | 1s |
+| 翻页 | `goto_page()` / `next_page()` | UnitPage | 1s |
+
+> 通用动作（按钮 / 输入 / 弹窗 / 浮层）在 `base_page.py`；勾选、翻页、行内删除确认这些
+> 依赖具体表格结构的动作落在各页面对象里（多单位、仓库），用法一致，都夹带间隔。
 
 `fill()` 同时接受选择器和 Locator，覆盖两种调用习惯：
 
@@ -593,6 +661,9 @@ self.fill(modal.locator("#name"), "测试商品")     # Locator
 | `select_row()` / `select_all()` | 300ms |
 | `clear_selection()` | 120ms |
 | `set_page_size()` 点开条数下拉 | 400ms |
+
+> 这三组都在页面对象里（`select_row` / `select_all` / `clear_selection` 三个页面都有，
+> `set_page_size` 仅多单位页），间隔是写死的固定值，不随 `ERP_ACTION_DELAY_MS` 变化。
 
 ### 配置
 

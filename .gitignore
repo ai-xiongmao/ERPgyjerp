@@ -6,3 +6,4 @@ reports/
 tools/allure/node_modules/
 .api_token
 tools/api_dump/
+dashboard/.cache/
