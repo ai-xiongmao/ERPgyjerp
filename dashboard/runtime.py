@@ -15,6 +15,13 @@ HOST = "127.0.0.1"
 PORT = int(os.environ.get("ERP_DASH_PORT", "8760"))
 STARTED_AT = time.time()
 
+# 服务端能力声明，随 /api/health 一起返回。
+# 为什么要它：页面 HTML 是每次请求实时读盘的，Python 路由却是进程启动时就定死的。
+# 改完代码不重启服务，就会出现「新按钮 + 旧路由」——点下去只能得到 404。
+# 页面拿这份清单自检，对不上就把按钮标成「需重启服务」，而不是让人对着报错猜。
+SERVER_VERSION = "1.1.0"
+SERVER_FEATURES = ("shutdown",)
+
 CASE_TTL = 300          # 用例清单缓存（秒）
 HEALTH_TTL = 5          # 环境探测周期（秒）
 MAX_LOG_LINES = 6000    # 单个任务保留的日志上限，防止长跑把内存吃掉

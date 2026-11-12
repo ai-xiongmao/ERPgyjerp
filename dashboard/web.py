@@ -3,7 +3,8 @@
 这是控制台唯一对外的一层，所以「谁可以被调、能被谁调」的防线都放在这里：
 - 只绑 127.0.0.1 / ::1，执行用例的能力不外泄到局域网；
 - 写操作校验 Origin，防止别的网页偷偷 POST 一条「跑全部用例」；
-- 打开报告的路径限定在 reports/ 下，不接受任意绝对路径。
+- 打开报告的路径限定在 reports/ 下，不接受任意绝对路径；
+- 「关闭服务」走同一套写操作校验，且只能关掉自己这个进程（没法关别人的）。
 """
 
 from __future__ import annotations
@@ -14,7 +15,7 @@ import socket
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-from . import runtime
+from . import lifecycle, runtime
 from .cases_feed import load_cases
 from .env import launch_browser, open_path, prepare_env
 from .health import health_snapshot, refresh_health
@@ -78,6 +79,10 @@ class Handler(BaseHTTPRequestHandler):
 
             if path == "/api/health":
                 payload = health_snapshot()
+                payload["server"] = {
+                    "version": runtime.SERVER_VERSION,
+                    "features": list(runtime.SERVER_FEATURES),
+                }
                 payload["run"] = RUNS.snapshot(offset=10 ** 9)
                 payload["run"]["log"] = []
                 return self._json(payload)
@@ -128,6 +133,18 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/stop":
                 stopped = RUNS.stop()
                 return self._json({"ok": stopped, "message": "已请求停止" if stopped else "当前没有运行中的任务"})
+
+            if path == "/api/shutdown":
+                # 先把跑着的子进程收掉：服务一退它就成孤儿进程，会在后台继续开浏览器、
+                # 写报告，而端口已经没了——看起来像「关了但没关干净」。
+                run_stopped = RUNS.stop()
+                if not lifecycle.stop_all():
+                    return self._error("当前进程没有可关闭的服务实例（可能已请求过关闭）", 409)
+                return self._json({
+                    "ok": True,
+                    "run_stopped": run_stopped,
+                    "message": "已中断执行中的任务，控制台正在关闭" if run_stopped else "控制台正在关闭",
+                })
 
             if path == "/api/refresh":
                 load_cases(force=True)

@@ -12,5 +12,6 @@ HTTP 路由、进程启动四件事。任何一处改动都要在一个近千行
               │     └── health.py   六项探测 + 后台轮询
               │           └── cases_feed.py   用例清单（子进程导出 + 缓存）
               ├── runs.py    任务执行：RunSession / RunManager
+              ├── lifecycle.py  进程收尾：登记服务实例 + 页面「关闭服务」时异步关停
               └── runtime.py / paths.py   常量
 """

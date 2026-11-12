@@ -33,7 +33,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
-from dashboard import runtime  # noqa: E402
+from dashboard import lifecycle, runtime  # noqa: E402
 from dashboard.cases_feed import load_cases  # noqa: E402
 from dashboard.health import health_loop, probe_http, refresh_health  # noqa: E402
 from dashboard.paths import CACHE_DIR, PYTHON, SERVER_LOG  # noqa: E402
@@ -94,6 +94,9 @@ def main(argv=None):
         print("       端口被其它程序占用，换一个：--port 8800")
         return 1
 
+    # 登记进生命周期表，页面上的「关闭服务」才有对象可关
+    lifecycle.register(server)
+
     # 先探一轮，别让页面首屏空着；用例清单也顺手预热
     try:
         load_cases()
@@ -105,6 +108,7 @@ def main(argv=None):
     # 再补一个 IPv6 回环，让 localhost 两种解析都能连上
     try:
         v6 = LoopbackV6Server(("::1", runtime.PORT), Handler)
+        lifecycle.register(v6)
         threading.Thread(target=v6.serve_forever, daemon=True).start()
     except OSError:
         v6 = None  # 没有 IPv6 或端口已被占，IPv4 已够用
@@ -116,7 +120,8 @@ def main(argv=None):
     print(" 注意：请访问上面的 http 地址；直接双击 dashboard/index.html")
     print("       会以 file:// 打开，接口全部连不上。")
     print(f" 解释器：{PYTHON}")
-    print(" Ctrl+C 结束（只关面板，不影响已跑完的用例与报告）")
+    print(" 关闭：页面右上「关闭服务」，或在本窗口 Ctrl+C")
+    print("       都只关面板，不影响已跑完的用例与报告")
     print("=" * 58)
 
     if not args.no_browser:
@@ -125,12 +130,13 @@ def main(argv=None):
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\n面板已停止")
+        pass  # Ctrl+C 和页面上的「关闭服务」走同一条收尾路径
     finally:
         server.server_close()
         if v6 is not None:
             v6.shutdown()
             v6.server_close()
+    print("面板已停止（端口已释放）")
     return 0
 
 
